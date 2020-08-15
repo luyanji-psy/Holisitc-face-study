@@ -5,29 +5,31 @@ Created on 25/February/2020
 Modified on 2/April/2020
 * To change 0.25Top cue & 0.75Top cue to 0.25cueTarget & 0.75cueTarget
 
+Updated on 8/June/2020
+32 participants in total
+
 @author: Ji
 
 """
 
 """
-1. Top/Bottom, Probabiltiy of top cue (0.25/0.75) as within-subject variable, put into the ANOVA
+1. Top/Bottom, Probabiltiy of top cue (0.25/0.75), Congruency, Alignment as within-subject variable, put into the ANOVA
 2. Use R packages to do ANOVA, with effect size output
+3. Use pingouin packages (only two-way repeated measure ANOVA supported), provide more options of effect sizes
 
-Traditional design: congruency * alignment
+Traditional design: same incongruent trials, aligned vs. misaligned
 Complementary design: same congruent trials, aligned vs. misaligned
 
 """
 
 """
-updated on April 24, 2020
-1. Descriptive results
-old: 
-    np.mean([RT_IAS_T] + [RT_IMS_T]); np.std([RT_IAS_T] + [RT_IMS_T])
-    np.mean([RT_IAS_B] + [RT_IMS_B]); np.std([RT_IAS_B] + [RT_IMS_B])
+    
+updated on May 4, 2020
+1. Check whether there are any outlier participants in this experiment
+-- grand mean accuracy (collapsed across conditions) for each participant, whether any individual 
+   had grand mean which was below or above 2.5sd of the grand mean of all participants
 
-new: 
-    a = IAS_IMS_RT_TB.groupby(['Participant','CuedHalf'])['reactionTime'].describe()    
-    a.groupby(['CuedHalf'])['mean'].describe() 
+!!! Participant nr.4 is the outlier !!!   
 """
 
 
@@ -43,20 +45,32 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import math
-from scipy.stats import norm
+from scipy.stats import norm, zscore
 from scipy import stats
 from statsmodels.stats.anova import AnovaRM
 Z = norm.ppf
+import copy
+import seaborn as sns
+
+import pingouin as pg
+from pingouin import ttest,pairwise_ttests
 
 import rpy2.robjects as robjects
 import rpy2.robjects.packages as rpackages
 from rpy2.robjects.vectors import StrVector
 from rpy2.robjects import r, pandas2ri
 
+packageNames = ('afex', 'emmeans')
+utils = rpackages.importr('utils')
+utils.chooseCRANmirror(ind=1)
+ 
+packnames_to_install = [x for x in packageNames if not rpackages.isinstalled(x)]
+ 
+if len(packnames_to_install) > 0:
+   utils.install_packages(StrVector(packnames_to_install))
+
 afex = rpackages.importr('afex')
 emmeans = rpackages.importr('emmeans', robject_translations = {"recover.data.call": "recover_data_call1"})
-
-import seaborn as sns
 
 plt.rcParams['font.family'] = 'Arial'
 plt.rcParams['xtick.labelsize'] = 18
@@ -69,8 +83,8 @@ plt.rcParams['figure.titlesize'] = 24
 import matplotlib as mpl
 mpl.rcParams.update(mpl.rcParamsDefault)
 
-raw_path = r'E:\Post-doc HKU\Haiyang\Cue_Complete_2575 proportion\CF_Complete_Cue_probability\Excel Data'
-path = r'E:\Post-doc HKU\Haiyang\Cue_Complete_2575 proportion\CF_Complete_Cue_probability\Analysis'
+raw_path = r'G:\Post-doc HKU\Haiyang\Cue_Complete_2575 proportion\CF_Complete_Cue_probability\Excel Data'
+path = r'G:\Post-doc HKU\Haiyang\Cue_Complete_2575 proportion\CF_Complete_Cue_probability\Analysis'
 
 # change the working folder to path
 os.chdir(raw_path)
@@ -84,7 +98,7 @@ rename condition levels
 Probability was recorded as "0.25Topcue" in both probability conditions
 
 """
-Data = Data0
+Data = copy.copy(Data0)
 
 def myfunc(x,y):
     if x == 'CF_Complete_75BottomCue':
@@ -121,7 +135,24 @@ Top & bottom, acc
 25%cueTarget & 75%cueTarget, separately
 
 """""
-summary = Data.groupby(['Participant','Probability','CuedHalf','Congruency', 'Alignment', 'SameDifferent'])['isCorrect'].mean()  
+summary = Data.groupby(['Participant','Probability','CuedHalf','Congruency', 'Alignment'], as_index=False)['isCorrect'].mean()  
+
+# grand mean of all conditions
+summary_par = Data.groupby(['Participant'])['isCorrect'].mean()  
+summary_par = summary_par.to_frame()
+summary_par['z_summary_par'] = stats.zscore(summary_par)
+summary_par['z_outlier'] = ['no' if (x > -2.5 and x < 2.5) else 'yes' for x in summary_par['z_summary_par']]
+# !!! partipant nr.4 is the outlier!!!
+
+# mean of each condition
+summary_wide = pd.pivot_table(summary, index = "Participant", columns = ['Probability','CuedHalf','Congruency', 'Alignment'], aggfunc = max)
+summary_wide_zscore = summary_wide.apply(zscore)
+i= 0
+for i in range(16):
+    summary_wide_zscore[str(i)] = ['no' if (x > -2.5 and x < 2.5) else 'yes' for x in summary_wide_zscore.iloc[:,i]]
+    i = i + 1
+# !!! partipant nr.4 had outlier acc in some of the conditions !!!
+
 
 # top cue
 Data_CA_T_25tar = Data[(Data['Probability'] == '0.25cueTarget') & (Data['CuedHalf'] == 'T') & (Data['Congruency'] == 'C') & (Data['Alignment'] == 'A')]
@@ -193,6 +224,7 @@ plt.text(2.75, 1.07, "75% cue target", size=20,
          ha="center", va="center")
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
+plt.tight_layout()
 plt.savefig('Congruency by alignment_accT.tiff')
 plt.show()
 
@@ -222,36 +254,41 @@ plt.text(2.75, 1.07, "75% cue target", size=20,
          ha="center", va="center")
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
+plt.tight_layout()
 plt.savefig('Congruency by alignment_accB.tiff')
 plt.show()
 
 
 # anova
 # four way: cue part, cue probability, congruency, alignment
-aovrm2way_acc = AnovaRM(Data, 'isCorrect', 'Participant', within = ['CuedHalf','Probability','Congruency', 'Alignment'], aggregate_func = 'mean')
-res2way_acc = aovrm2way_acc.fit()
-print (res2way_acc) 
+pandas2ri.activate()
+r_Data = pandas2ri.py2ri(Data)
+
+model_acc = afex.aov_ez('Participant', 'isCorrect', r_Data, within = ['CuedHalf','Probability','Congruency', 'Alignment'])  
+print(model_acc)
 # Main effect of probability, congruency
 # No four-way interaction
 # Three-way interaction: cuedHalf x Congruency x Alignment
-# Two-way interaction: Congruency x Alignment, probability x congruency
+# Two-way interaction: Congruency x Alignment, Cuedhalf * Alignment, Probability x Congruency
 
 # To examine three way: cuedHalf, congruency, alignment
 # Top
-aovrm2way_acc_T = AnovaRM(Data[Data['CuedHalf'] == 'T'], 'isCorrect', 'Participant', within = ['Congruency', 'Alignment'], aggregate_func = 'mean')
-res2way_acc_T = aovrm2way_acc_T.fit()
-print (res2way_acc_T) 
+r_Data_Top = pandas2ri.py2ri(Data[Data['CuedHalf'] == 'T'])
+
+model_accT = afex.aov_ez('Participant', 'isCorrect', r_Data_Top, within = ['Congruency', 'Alignment'])  
+print(model_accT)
 # Main effect of Congruency, Main effect of Alignment
 # Interaction between congruency and alignment
 
 
 # To examine three way: cuedHalf, congruency, alignment
 # Bottom
-aovrm2way_acc_B = AnovaRM(Data[Data['CuedHalf'] == 'B'], 'isCorrect', 'Participant', within = ['Congruency', 'Alignment'], aggregate_func = 'mean')
-res2way_acc_B = aovrm2way_acc_B.fit()
-print (res2way_acc_B) 
+r_Data_Bottom = pandas2ri.py2ri(Data[Data['CuedHalf'] == 'B'])
+
+model_accB = afex.aov_ez('Participant', 'isCorrect', r_Data_Bottom, within = ['Congruency', 'Alignment'])  
+print(model_accB)
 # Main effect of Congruency. No main effect of alignment!
-# No interaction between congruency and alignment!! 
+# No interaction between congruency and alignment!! , p = .061
 
 
 """""""""""""""""""""""""""""""""""""""
@@ -296,9 +333,9 @@ IAS_IMS_acc_TB_25tar = IAS_IMS_acc_TB_25tar.append(pd.DataFrame(data = acc_IMS_T
 IAS_IMS_acc_TB_25tar = IAS_IMS_acc_TB_25tar.append(pd.DataFrame(data = acc_IAS_B_25tar))
 IAS_IMS_acc_TB_25tar = IAS_IMS_acc_TB_25tar.append(pd.DataFrame(data = acc_IMS_B_25tar))
 
-IAS_IMS_acc_TB_25tar['CuedHalf'] = ['Top']*40 + ['Bottom']*40
-IAS_IMS_acc_TB_25tar['Alignment'] = ['Aligned']*20 + ['MisAligned']*20 + ['Aligned']*20 + ['MisAligned']*20
-IAS_IMS_acc_TB_25tar['participant'] = list(range(1,21)) * 4
+IAS_IMS_acc_TB_25tar['CuedHalf'] = ['Top']*64 + ['Bottom']*64
+IAS_IMS_acc_TB_25tar['Alignment'] = ['Aligned']*32 + ['MisAligned']*32 + ['Aligned']*32 + ['MisAligned']*32
+IAS_IMS_acc_TB_25tar['participant'] = list(range(1,33)) * 4
 
 
 # acc, 75% cue target
@@ -307,14 +344,14 @@ IAS_IMS_acc_TB_75tar = IAS_IMS_acc_TB_75tar.append(pd.DataFrame(data = acc_IMS_T
 IAS_IMS_acc_TB_75tar = IAS_IMS_acc_TB_75tar.append(pd.DataFrame(data = acc_IAS_B_75tar))
 IAS_IMS_acc_TB_75tar = IAS_IMS_acc_TB_75tar.append(pd.DataFrame(data = acc_IMS_B_75tar))
 
-IAS_IMS_acc_TB_75tar['CuedHalf'] = ['Top']*40 + ['Bottom']*40
-IAS_IMS_acc_TB_75tar['Alignment'] = ['Aligned']*20 + ['MisAligned']*20 + ['Aligned']*20 + ['MisAligned']*20
-IAS_IMS_acc_TB_75tar['participant'] = list(range(1,21)) * 4
+IAS_IMS_acc_TB_75tar['CuedHalf'] = ['Top']*64 + ['Bottom']*64
+IAS_IMS_acc_TB_75tar['Alignment'] = ['Aligned']*32 + ['MisAligned']*32 + ['Aligned']*32 + ['MisAligned']*32
+IAS_IMS_acc_TB_75tar['participant'] = list(range(1,33)) * 4
 
 # combined acc data
 IAS_IMS_acc_TB = pd.DataFrame(data = IAS_IMS_acc_TB_25tar)
 IAS_IMS_acc_TB = IAS_IMS_acc_TB.append(pd.DataFrame(data = IAS_IMS_acc_TB_75tar))
-IAS_IMS_acc_TB['Probability'] = ['25cueTarget']*80 + ['75cueTarget']*80 
+IAS_IMS_acc_TB['Probability'] = ['25cueTarget']*128 + ['75cueTarget']*128 
 
 # ANOVA 
 pandas2ri.activate()
@@ -326,42 +363,41 @@ print(model)
 # Interaction bteween cuedhalf and alignment; no three-way interaction
 
 # main effect
-acc_IAS_IMS_acc_TB_prob = IAS_IMS_acc_TB.groupby(['Probability'])['isCorrect'].mean()
-accsd_IAS_IMS_acc_TB_prob = IAS_IMS_acc_TB.groupby(['Probability'])['isCorrect'].std()
+main_prob = emmeans.emmeans(model, 'Probability', contr = 'pairwise', adjust = 'bonferroni')
+print(main_prob)
+
+main_align = emmeans.emmeans(model, 'Alignment', contr = 'pairwise', adjust = 'bonferroni')
+print(main_align)
 
 # simple effect
-IAS_IMS_acc_TB.groupby(['CuedHalf', 'Alignment'])['isCorrect'].mean()
-IAS_IMS_acc_TB.groupby(['CuedHalf', 'Alignment'])['isCorrect'].std()
+inter_cuedhalf_align = emmeans.emmeans(model, 'Alignment', by = 'CuedHalf', contr = 'pairwise', adjust = 'bonferroni')
+print(inter_cuedhalf_align)
 
 # top target
-Data_IAS_T_A = Data[(Data['CuedHalf'] == 'T') & (Data['Alignment'] == 'A')]
-Data_IAS_T_M = Data[(Data['CuedHalf'] == 'T') & (Data['Alignment'] == 'M')]
+IAS_IMS_acc_T = IAS_IMS_acc_TB[(IAS_IMS_acc_TB['CuedHalf'] == 'Top')] 
+IAS_IMS_acc_T_stats = IAS_IMS_acc_T.groupby(['participant','CuedHalf','Alignment'])['isCorrect'].mean()
+IAS_IMS_acc_T_stats0 = pairwise_ttests(dv='isCorrect', within='Alignment',
+                            subject='participant', data= IAS_IMS_acc_T_stats.to_frame().reset_index(),
+                            effsize='cohen')
+# top: acc(aligned) < acc(misaligned), t(31)=-6.08, p<.0001, d = -.6
 
-acc_IAS_T_A = Data_IAS_T_A.groupby(['Participant'])['isCorrect'].mean()
-acc_IAS_T_M = Data_IAS_T_M.groupby(['Participant'])['isCorrect'].mean()
-t, p = stats.ttest_rel(acc_IAS_T_A, acc_IAS_T_M)
-print(t,p)  # top: acc(aligned) < acc(misaligned), t(19)=-2.41, p=.026
 
 # bottom target
-Data_IAS_B_A = Data[(Data['CuedHalf'] == 'B') & (Data['Alignment'] == 'A')]
-Data_IAS_B_M = Data[(Data['CuedHalf'] == 'B') & (Data['Alignment'] == 'M')]
-
-acc_IAS_B_A = Data_IAS_B_A.groupby(['Participant'])['isCorrect'].mean()
-acc_IAS_B_M = Data_IAS_B_M.groupby(['Participant'])['isCorrect'].mean()
-t, p = stats.ttest_rel(acc_IAS_B_A, acc_IAS_B_M)
-print(t,p)  # bottom: acc(aligned) = acc(misaligned), t(19)=.90, p=.38
+IAS_IMS_acc_B = IAS_IMS_acc_TB[(IAS_IMS_acc_TB['CuedHalf'] == 'Bottom')] 
+IAS_IMS_acc_B_stats = IAS_IMS_acc_B.groupby(['participant','CuedHalf','Alignment'])['isCorrect'].mean()
+IAS_IMS_acc_B_stats0 = pairwise_ttests(dv='isCorrect', within='Alignment',
+                            subject='participant', data= IAS_IMS_acc_B_stats.to_frame().reset_index(),
+                            effsize='cohen')
+# top: acc(aligned) < acc(misaligned), t(31)=-.59, p=.56, d = -.05
 
 
 # descriptive
-np.mean(acc_IAS_T_A)
-np.std(acc_IAS_T_A)
-np.mean(acc_IAS_T_M)
-np.std(acc_IAS_T_M)
+a = IAS_IMS_acc_TB.groupby(['participant','CuedHalf','Alignment'])['isCorrect'].describe()
+a.groupby(['CuedHalf','Alignment'])['mean'].describe()
 
-np.mean(acc_IAS_B_A)
-np.std(acc_IAS_B_A)
-np.mean(acc_IAS_B_M)
-np.std(acc_IAS_B_M)
+a = IAS_IMS_acc_TB.groupby(['participant','Probability'])['isCorrect'].describe()
+a.groupby(['Probability'])['mean'].describe()
+
 
 """""""""""
 Plot: two probabilities separately
@@ -472,9 +508,9 @@ CAS_CMS_acc_TB_25tar = CAS_CMS_acc_TB_25tar.append(pd.DataFrame(data = acc_CMS_T
 CAS_CMS_acc_TB_25tar = CAS_CMS_acc_TB_25tar.append(pd.DataFrame(data = acc_CAS_B_25tar))
 CAS_CMS_acc_TB_25tar = CAS_CMS_acc_TB_25tar.append(pd.DataFrame(data = acc_CMS_B_25tar))
 
-CAS_CMS_acc_TB_25tar['CuedHalf'] = ['Top']*40 + ['Bottom']*40
-CAS_CMS_acc_TB_25tar['Alignment'] = ['Aligned']*20 + ['MisAligned']*20 + ['Aligned']*20 + ['MisAligned']*20
-CAS_CMS_acc_TB_25tar['participant'] = list(range(1,21)) * 4
+CAS_CMS_acc_TB_25tar['CuedHalf'] = ['Top']*64 + ['Bottom']*64
+CAS_CMS_acc_TB_25tar['Alignment'] = ['Aligned']*32 + ['MisAligned']*32 + ['Aligned']*32 + ['MisAligned']*32
+CAS_CMS_acc_TB_25tar['participant'] = list(range(1,33)) * 4
 
 # acc, 75% cue target
 CAS_CMS_acc_TB_75tar = pd.DataFrame(data = acc_CAS_T_75tar)
@@ -482,14 +518,14 @@ CAS_CMS_acc_TB_75tar = CAS_CMS_acc_TB_75tar.append(pd.DataFrame(data = acc_CMS_T
 CAS_CMS_acc_TB_75tar = CAS_CMS_acc_TB_75tar.append(pd.DataFrame(data = acc_CAS_B_75tar))
 CAS_CMS_acc_TB_75tar = CAS_CMS_acc_TB_75tar.append(pd.DataFrame(data = acc_CMS_B_75tar))
 
-CAS_CMS_acc_TB_75tar['CuedHalf'] = ['Top']*40 + ['Bottom']*40
-CAS_CMS_acc_TB_75tar['Alignment'] = ['Aligned']*20 + ['MisAligned']*20 + ['Aligned']*20 + ['MisAligned']*20
-CAS_CMS_acc_TB_75tar['participant'] = list(range(1,21)) * 4
+CAS_CMS_acc_TB_75tar['CuedHalf'] = ['Top']*64 + ['Bottom']*64
+CAS_CMS_acc_TB_75tar['Alignment'] = ['Aligned']*32 + ['MisAligned']*32 + ['Aligned']*32 + ['MisAligned']*32
+CAS_CMS_acc_TB_75tar['participant'] = list(range(1,33)) * 4
 
 # combined acc data
 CAS_CMS_acc_TB = pd.DataFrame(data = CAS_CMS_acc_TB_25tar)
 CAS_CMS_acc_TB = CAS_CMS_acc_TB.append(pd.DataFrame(data = CAS_CMS_acc_TB_75tar))
-CAS_CMS_acc_TB['Probability'] = ['25cueTarget']*80 + ['75cueTarget']*80 
+CAS_CMS_acc_TB['Probability'] = ['25cueTarget']*128 + ['75cueTarget']*128 
 
 # ANOVA 
 pandas2ri.activate()
@@ -498,22 +534,43 @@ r_CAS_CMS_acc = pandas2ri.py2ri(CAS_CMS_acc_TB)
 model = afex.aov_ez('participant', 'isCorrect', r_CAS_CMS_acc, within = ['Probability','CuedHalf', 'Alignment'])
 print(model)
 # Main effect of probability, alignment
-# No interaction bteween cuedhalf and alignment
+# No interaction bteween cuedhalf and alignment; no three-way interaction
 
 # main effect
-acc_CAS_CMS_acc_TB_prob = CAS_CMS_acc_TB.groupby(['Probability'])['isCorrect'].mean()
-accsd_CAS_CMS_acc_TB_prob = CAS_CMS_acc_TB.groupby(['Probability'])['isCorrect'].std()
+main_prob = emmeans.emmeans(model, 'Probability', contr = 'pairwise', adjust = 'bonferroni')
+print(main_prob)
 
-acc_CAS_CMS_acc_TB_align = CAS_CMS_acc_TB.groupby(['Alignment'])['isCorrect'].mean()
-accsd_CAS_CMS_acc_TB_align = CAS_CMS_acc_TB.groupby(['Alignment'])['isCorrect'].std()
+main_align = emmeans.emmeans(model, 'Alignment', contr = 'pairwise', adjust = 'bonferroni')
+print(main_align)
 
-"""
-CAS_CMS_acc_TB.groupby(['Alignment'])['isCorrect'].mean()
-CAS_CMS_acc_TB.groupby(['Alignment'])['isCorrect'].std()
-"""
+# simple effect
+#inter_cuedhalf_align = emmeans.emmeans(model, 'Alignment', by = 'CuedHalf', contr = 'pairwise', adjust = 'bonferroni')
+#print(inter_cuedhalf_align)
 
-a = CAS_CMS_acc_TB.groupby(['participant','Alignment'])['isCorrect'].describe()
-a.groupby(['Alignment'])['mean'].describe()
+# top target
+CAS_CMS_acc_T = CAS_CMS_acc_TB[(CAS_CMS_acc_TB['CuedHalf'] == 'Top')] 
+CAS_CMS_acc_T_stats = CAS_CMS_acc_T.groupby(['participant','CuedHalf','Alignment'])['isCorrect'].mean()
+CAS_CMS_acc_T_stats0 = pairwise_ttests(dv='isCorrect', within='Alignment',
+                            subject='participant', data= CAS_CMS_acc_T_stats.to_frame().reset_index(),
+                            effsize='cohen')
+# top: acc(aligned) > acc(misaligned), t(31)=2.20, p=.035, d = .24
+
+
+# bottom target
+CAS_CMS_acc_B = CAS_CMS_acc_TB[(CAS_CMS_acc_TB['CuedHalf'] == 'Bottom')] 
+CAS_CMS_acc_B_stats = CAS_CMS_acc_B.groupby(['participant','CuedHalf','Alignment'])['isCorrect'].mean()
+CAS_CMS_acc_B_stats0 = pairwise_ttests(dv='isCorrect', within='Alignment',
+                            subject='participant', data= CAS_CMS_acc_B_stats.to_frame().reset_index(),
+                            effsize='cohen')
+# top: acc(aligned) > acc(misaligned), t(31)=2.36, p=.025, d = .24
+
+
+# descriptive
+a = CAS_CMS_acc_TB.groupby(['participant','CuedHalf','Alignment'])['isCorrect'].describe()
+a.groupby(['CuedHalf','Alignment'])['mean'].describe()
+
+a = CAS_CMS_acc_TB.groupby(['participant','Probability'])['isCorrect'].describe()
+a.groupby(['Probability'])['mean'].describe()
 
 
 """""""""""
@@ -616,33 +673,8 @@ plt.text(2.75, 1.1, "Same incongruent", size=20,
          ha="center", va="center")
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
+plt.tight_layout()
 plt.savefig('Traditional + Complementary_acc_25tar.tiff')
-plt.show()
-
-# color plot
-barWidth = 0.4
-r1 = np.arange(4)
-r2 = [x + barWidth for x in r1]
-names = ['Same Congruent','Same Incongruent','Same Congruent','Same Incongruent']
-values1 = [np.mean(acc_CAS_T_25tar), np.mean(acc_IAS_T_25tar), np.mean(acc_CAS_B_25tar), np.mean(acc_IAS_B_25tar)]
-errors1 = [stats.sem(acc_CAS_T_25tar),stats.sem(acc_IAS_T_25tar), stats.sem(acc_CAS_B_25tar),stats.sem(acc_IAS_B_25tar)]
-values2 = [np.mean(acc_CMS_T_25tar), np.mean(acc_IMS_T_25tar), np.mean(acc_CMS_B_25tar), np.mean(acc_IMS_B_25tar)]
-errors2 = [stats.sem(acc_CMS_T_25tar),stats.sem(acc_IMS_T_25tar), stats.sem(acc_CMS_B_25tar),stats.sem(acc_IMS_B_25tar)]
-
-fig,ax = plt.subplots(figsize=(8,6),dpi=100)
-plt.bar(r1, values1, yerr=errors1, width=barWidth, label = 'Aligned')
-plt.bar(r2, values2, yerr=errors2, width=barWidth, label = 'Misaligned')
-plt.ylim((0,1.1))
-plt.ylabel('Accuracy')
-ax.set_title('25% cue', fontweight="bold", fontsize=24)
-plt.xticks([(r + barWidth/2) for r in range(4)], names)
-ax.tick_params(axis='x', which='major', labelsize=13)
-ax.legend(bbox_to_anchor=[0.5, 0.5, 0, 0.45], loc='upper center', ncol=2, prop=dict(size=18))
-plt.text(0.75, 1.06, "Top", size=20,
-         ha="center", va="center")
-plt.text(2.75, 1.06, "Bottom", size=20,
-         ha="center", va="center")
-plt.savefig('Traditional + Complementary_acc_25tar_color.tiff')
 plt.show()
 
 
@@ -671,33 +703,8 @@ plt.text(2.75, 1.1, "Same incongruent", size=20,
          ha="center", va="center")
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
+plt.tight_layout()
 plt.savefig('Traditional + Complementary_acc_75tar.tiff')
-plt.show()
-
-# color plot
-barWidth = 0.4
-r1 = np.arange(4)
-r2 = [x + barWidth for x in r1]
-names = ['Same Congruent','Same Incongruent','Same Congruent','Same Incongruent']
-values1 = [np.mean(acc_CAS_T_75tar), np.mean(acc_IAS_T_75tar), np.mean(acc_CAS_B_75tar), np.mean(acc_IAS_B_75tar)]
-errors1 = [stats.sem(acc_CAS_T_75tar),stats.sem(acc_IAS_T_75tar), stats.sem(acc_CAS_B_75tar),stats.sem(acc_IAS_B_75tar)]
-values2 = [np.mean(acc_CMS_T_75tar), np.mean(acc_IMS_T_75tar), np.mean(acc_CMS_B_75tar), np.mean(acc_IMS_B_75tar)]
-errors2 = [stats.sem(acc_CMS_T_75tar),stats.sem(acc_IMS_T_75tar), stats.sem(acc_CMS_B_75tar),stats.sem(acc_IMS_B_75tar)]
-
-fig,ax = plt.subplots(figsize=(8,6),dpi=100)
-plt.bar(r1, values1, yerr=errors1, width=barWidth, label = 'Aligned')
-plt.bar(r2, values2, yerr=errors2, width=barWidth, label = 'Misaligned')
-plt.ylim((0,1.1))
-plt.ylabel('Accuracy')
-ax.set_title('75% cue', fontweight="bold", fontsize=24)
-plt.xticks([(r + barWidth/2) for r in range(4)], names)
-ax.tick_params(axis='x', which='major', labelsize=13)
-ax.legend(bbox_to_anchor=[0.5, 0.5, 0, 0.45], loc='upper center', ncol=2, prop=dict(size=18))
-plt.text(0.75, 1.06, "Top", size=20,
-         ha="center", va="center")
-plt.text(2.75, 1.06, "Bottom", size=20,
-         ha="center", va="center")
-plt.savefig('Traditional + Complementary_acc_75tar_color.tiff')
 plt.show()
 
 
@@ -714,7 +721,7 @@ n = 40 in the present study
 """"""""""
 n = 40
 def SDT (hits, fas):
-    for i in range(20):
+    for i in range(32):
         if hits[i] == 1:
             hits[i] = (n-0.5)/n
         if hits[i] == 0:
@@ -769,14 +776,29 @@ d_IM_B_25tar = SDT(hit_IM_B_25tar.tolist(),fa_IM_B_25tar.tolist())
 
 ## one-sample t test, whether d prime is different from zero
 # in all conditions, the d prime was significant larger than zero, except p8!!!
-t1, p1 = stats.ttest_1samp(d_CA_T_25tar,0.0)
-t2, p2 = stats.ttest_1samp(d_CM_T_25tar,0.0) 
-t3, p3 = stats.ttest_1samp(d_IA_T_25tar,0.0)  # incongruent aligned bottom, t3(19) = .37, p3 = .72
-t4, p4 = stats.ttest_1samp(d_IM_T_25tar,0.0)
-t5, p5 = stats.ttest_1samp(d_CA_B_25tar,0.0)
-t6, p6 = stats.ttest_1samp(d_CM_B_25tar,0.0) 
-t7, p7 = stats.ttest_1samp(d_IA_B_25tar,0.0) # incongruent aligned bottom, t7(19) = .25, p7 = .80
-t8, p8 = stats.ttest_1samp(d_IM_B_25tar,0.0) # incongruent misaligned bottom, t8(19) = -.045, p8 = .96
+#t1, p1 = stats.ttest_1samp(d_CA_T_25tar,0.0)
+#t2, p2 = stats.ttest_1samp(d_CM_T_25tar,0.0) 
+#t3, p3 = stats.ttest_1samp(d_IA_T_25tar,0.0)  
+#t4, p4 = stats.ttest_1samp(d_IM_T_25tar,0.0)
+#t5, p5 = stats.ttest_1samp(d_CA_B_25tar,0.0)
+#t6, p6 = stats.ttest_1samp(d_CM_B_25tar,0.0) 
+#t7, p7 = stats.ttest_1samp(d_IA_B_25tar,0.0) 
+#t8, p8 = stats.ttest_1samp(d_IM_B_25tar,0.0) 
+
+e1 = ttest(d_CA_T_25tar,0.0)
+e2 = ttest(d_CM_T_25tar,0.0)
+e3 = ttest(d_IA_T_25tar,0.0)  # incongruent aligned bottom, t(31) = .28, p3 = .78, d=.05
+e4 = ttest(d_IM_T_25tar,0.0)
+[e1['p-val'],e2['p-val'],e3['p-val'],e4['p-val']]
+[e1['cohen-d'],e2['cohen-d'],e3['cohen-d'],e4['cohen-d']]
+
+e5 = ttest(d_CA_B_25tar,0.0)
+e6 = ttest(d_CM_B_25tar,0.0)
+e7 = ttest(d_IA_B_25tar,0.0)   # incongruent aligned bottom, t(31) = .73, p7 = .47
+e8 = ttest(d_IM_B_25tar,0.0)   # incongruent misaligned bottom, t(31) = .30, p8 = .77
+[e5['p-val'],e6['p-val'],e7['p-val'],e8['p-val']]
+[e5['cohen-d'],e6['cohen-d'],e7['cohen-d'],e8['cohen-d']]
+
 
 dprime_25tar = pd.DataFrame(
     {'Congruent_Aligned_Top': d_CA_T_25tar,
@@ -790,11 +812,11 @@ dprime_25tar = pd.DataFrame(
     })
 
 dprime25tar_long = pd.melt(dprime_25tar, value_name='d')
-dprime25tar_long['CuedHalf'] = ['Top']*80 + ['Bottom']*80
-dprime25tar_long['Alignment'] = (['Aligned']*20 + ['MisAligned']*20) * 4 
-dprime25tar_long['Congruency'] = (['Congruent']*40 + ['Incongruent']*40) * 2
-dprime25tar_long['participant'] = list(range(1,21)) * 8
-dprime25tar_long['ProbabilityCue'] = ['25cueTarget']*160
+dprime25tar_long['CuedHalf'] = ['Top']*128 + ['Bottom']*128
+dprime25tar_long['Alignment'] = (['Aligned']*32 + ['MisAligned']*32) * 4 
+dprime25tar_long['Congruency'] = (['Congruent']*64 + ['Incongruent']*64) * 2
+dprime25tar_long['participant'] = list(range(1,33)) * 8
+dprime25tar_long['ProbabilityCue'] = ['25cueTarget']*256
 
 
 """""
@@ -837,14 +859,28 @@ d_IM_B_75tar = SDT(hit_IM_B_75tar.tolist(),fa_IM_B_75tar.tolist())
 
 ## one-sample t test, whether d prime is different from zero
 # in all conditions, the d prime was significant larger than zero, except p8!!!
-t1, p1 = stats.ttest_1samp(d_CA_T_75tar,0.0)
-t2, p2 = stats.ttest_1samp(d_CM_T_75tar,0.0) 
-t3, p3 = stats.ttest_1samp(d_IA_T_75tar,0.0)
-t4, p4 = stats.ttest_1samp(d_IM_T_75tar,0.0)
-t5, p5 = stats.ttest_1samp(d_CA_B_75tar,0.0)
-t6, p6 = stats.ttest_1samp(d_CM_B_75tar,0.0) 
-t7, p7 = stats.ttest_1samp(d_IA_B_75tar,0.0)
-t8, p8 = stats.ttest_1samp(d_IM_B_75tar,0.0) 
+#t1, p1 = stats.ttest_1samp(d_CA_T_75tar,0.0)
+#t2, p2 = stats.ttest_1samp(d_CM_T_75tar,0.0) 
+#t3, p3 = stats.ttest_1samp(d_IA_T_75tar,0.0)
+#t4, p4 = stats.ttest_1samp(d_IM_T_75tar,0.0)
+#t5, p5 = stats.ttest_1samp(d_CA_B_75tar,0.0)
+#t6, p6 = stats.ttest_1samp(d_CM_B_75tar,0.0) 
+#t7, p7 = stats.ttest_1samp(d_IA_B_75tar,0.0)
+#t8, p8 = stats.ttest_1samp(d_IM_B_75tar,0.0) 
+
+e1 = ttest(d_CA_T_75tar,0.0)
+e2 = ttest(d_CM_T_75tar,0.0)
+e3 = ttest(d_IA_T_75tar,0.0) 
+e4 = ttest(d_IM_T_75tar,0.0)
+[e1['p-val'],e2['p-val'],e3['p-val'],e4['p-val']]
+[e1['cohen-d'],e2['cohen-d'],e3['cohen-d'],e4['cohen-d']]
+
+e5 = ttest(d_CA_B_75tar,0.0)
+e6 = ttest(d_CM_B_75tar,0.0)
+e7 = ttest(d_IA_B_75tar,0.0)   
+e8 = ttest(d_IM_B_75tar,0.0)   
+[e5['p-val'],e6['p-val'],e7['p-val'],e8['p-val']]
+[e5['cohen-d'],e6['cohen-d'],e7['cohen-d'],e8['cohen-d']]
 
 dprime_75tar = pd.DataFrame(
     {'Congruent_Aligned_Top': d_CA_T_75tar,
@@ -858,11 +894,11 @@ dprime_75tar = pd.DataFrame(
     })
 
 dprime75tar_long = pd.melt(dprime_75tar, value_name='d')
-dprime75tar_long['CuedHalf'] = ['Top']*80 + ['Bottom']*80
-dprime75tar_long['Alignment'] = (['Aligned']*20 + ['MisAligned']*20) * 4 
-dprime75tar_long['Congruency'] = (['Congruent']*40 + ['Incongruent']*40) * 2
-dprime75tar_long['participant'] = list(range(1,21)) * 8
-dprime75tar_long['ProbabilityCue'] = ['75cueTarget']*160
+dprime75tar_long['CuedHalf'] = ['Top']*128 + ['Bottom']*128
+dprime75tar_long['Alignment'] = (['Aligned']*32 + ['MisAligned']*32) * 4 
+dprime75tar_long['Congruency'] = (['Congruent']*64 + ['Incongruent']*64) * 2
+dprime75tar_long['participant'] = list(range(1,33)) * 8
+dprime75tar_long['ProbabilityCue'] = ['75cueTarget']*256
 
 
 dprime_long = dprime25tar_long
@@ -871,10 +907,6 @@ dprime_long = dprime_long.append(pd.DataFrame(data = dprime75tar_long))
 
 # anova
 # four way: cue part, cue probability, congruency, alignment
-aovrm2way_d = AnovaRM(dprime_long, 'd', 'participant', within = ['CuedHalf','ProbabilityCue','Congruency', 'Alignment'], aggregate_func = 'mean')
-res2way_d = aovrm2way_d.fit()
-print (res2way_d) 
-
 pandas2ri.activate()
 r_dprime = pandas2ri.py2ri(dprime_long)
 
@@ -882,30 +914,53 @@ model = afex.aov_ez('participant', 'd', r_dprime, within = ['ProbabilityCue','Cu
 print(model)
 # main effect of probability, and congruency
 # three-way interaction between cuedhalf, congruency and alignment
-# two-way interaction between congruency and alignment
+# two-way interaction between congruency and alignment, probability and congruency, cued half and alignment
 # no four-way interaction
 
-# simple effect
-# Top
-aovrm2way_dprimeT = AnovaRM(dprime_long[dprime_long['CuedHalf'] == 'Top'], 'd', 'participant', within = ['Alignment', 'Congruency'], aggregate_func = 'mean')
-res2way_dprimeT = aovrm2way_dprimeT.fit()
-print (res2way_dprimeT) 
-# main effect of alignment, congruency
-# interaction between alignment and congruency
+# main effect
+main_prob = emmeans.emmeans(model, 'ProbabilityCue', contr = 'pairwise', adjust = 'bonferroni')
+print(main_prob)
 
-# Bottom
-aovrm2way_dprimeT = AnovaRM(dprime_long[dprime_long['CuedHalf'] == 'Top'], 'd', 'participant', within = ['Alignment', 'Congruency'], aggregate_func = 'mean')
-res2way_dprimeT = aovrm2way_dprimeT.fit()
-print (res2way_dprimeT) 
+main_congr = emmeans.emmeans(model, 'Congruency', contr = 'pairwise', adjust = 'bonferroni')
+print(main_congr)
+
+# simple effect
+inter_cuedhalf_align = emmeans.emmeans(model, 'Alignment', by = 'CuedHalf', contr = 'pairwise', adjust = 'bonferroni')
+print(inter_cuedhalf_align)
+
+inter_congr_align = emmeans.emmeans(model, 'Alignment', by = 'Congruency', contr = 'pairwise', adjust = 'bonferroni')
+print(inter_congr_align)
+
+inter_congr_prob = emmeans.emmeans(model, 'ProbabilityCue', by = 'Congruency', contr = 'pairwise', adjust = 'bonferroni')
+print(inter_congr_prob)
+
+# top target
+d_T = dprime_long[(dprime_long['CuedHalf'] == 'Top')] 
+r_dprime_T = pandas2ri.py2ri(d_T)
+model_dprimeT = afex.aov_ez('participant', 'd', r_dprime_T, within = ['Alignment','Congruency'])
+print(model_dprimeT) 
+# interaction between alignment and congruency
+inter_congr_align = emmeans.emmeans(model_dprimeT, 'Alignment', by = 'Congruency', contr = 'pairwise', adjust = 'bonferroni')
+print(inter_congr_align)
+
+inter_congr_align = emmeans.emmeans(model_dprimeT, 'Congruency', by = 'Alignment', contr = 'pairwise', adjust = 'bonferroni')
+print(inter_congr_align)
+
+
+# bottom target
+d_B = dprime_long[(dprime_long['CuedHalf'] == 'Bottom')] 
+r_dprime_B = pandas2ri.py2ri(d_B)
+model_dprimeB = afex.aov_ez('participant', 'd', r_dprime_B, within = ['Alignment','Congruency'])
+print(model_dprimeB) 
+# interaction between alignment and congruency
+inter_congr_align2 = emmeans.emmeans(model_dprimeB, 'Alignment', by = 'Congruency', contr = 'pairwise', adjust = 'bonferroni')
+print(inter_congr_align2)
+
+inter_congr_align2 = emmeans.emmeans(model_dprimeB, 'Congruency', by = 'Alignment', contr = 'pairwise', adjust = 'bonferroni')
+print(inter_congr_align2)
 
 # descriptive    
-"""
-np.mean(dprime75tar_long)
-np.std(dprime75tar_long)
 
-np.mean(dprime25tar_long)
-np.std(dprime25tar_long)
-"""
 
 a = dprime_long.groupby(['participant','ProbabilityCue'])['d'].describe()    
 a.groupby(['ProbabilityCue'])['mean'].describe() 
@@ -943,48 +998,6 @@ ax.spines['top'].set_visible(False)
 plt.savefig('Congruency by alignment_dprime25tar.tiff')
 plt.show()
 
-# color graph
-fig,ax = plt.subplots(figsize=(12,10),dpi=100)
-plt.bar(r1, values1, yerr=errors1, width=barWidth, label = 'Congruent')
-plt.bar(r2, values2, yerr=errors2, width=barWidth, label = 'Incongruent')
-plt.ylim((0,3.5))
-plt.ylabel('d prime')
-ax.set_title('25% Cue', fontweight="bold", fontsize=24)
-plt.xticks([(r + barWidth/2) for r in range(4)], names)
-ax.legend(bbox_to_anchor=[0.5, 0.5, 0, 0.45], loc='upper center', ncol=2)
-plt.text(0.75, 3.35, "Top", size=20,
-         ha="center", va="center")
-plt.text(2.75, 3.35, "Bottom", size=20,
-         ha="center", va="center")
-plt.savefig('Congruency by alignment_dprime25tar_color.tiff')
-plt.show()
-
-# color graph2
-barWidth = 0.4
-r1 = np.arange(4)
-r2 = [x + barWidth for x in r1]
-names = ['Congruent','Incongruent','Congruent','Incongruent']
-
-values1 = [np.mean(d_CA_T_25tar), np.mean(d_IA_T_25tar), np.mean(d_CA_B_25tar), np.mean(d_IA_B_25tar)]
-errors1 = [stats.sem(d_CA_T_25tar),stats.sem(d_IA_T_25tar), stats.sem(d_CA_B_25tar),stats.sem(d_IA_B_25tar)]
-values2 = [np.mean(d_CM_T_25tar), np.mean(d_IM_T_25tar), np.mean(d_CM_B_25tar), np.mean(d_IM_B_25tar)]
-errors2 = [stats.sem(d_CM_T_25tar),stats.sem(d_IM_T_25tar), stats.sem(d_CM_B_25tar),stats.sem(d_IM_B_25tar)]
-
-fig,ax = plt.subplots(figsize=(8,6),dpi=100)
-plt.bar(r1, values1, yerr=errors1, width=barWidth, label = 'Aligned')
-plt.bar(r2, values2, yerr=errors2, width=barWidth, label = 'Misaligned')
-plt.ylim((0,3.5))
-plt.ylabel('d prime')
-ax.set_title('25% Cue', fontweight="bold", fontsize=24)
-plt.xticks([(r + barWidth/2) for r in range(4)], names)
-ax.tick_params(axis='x', which='major', labelsize=18)
-ax.legend(bbox_to_anchor=[0.5, 0.5, 0, 0.45], loc='upper center', ncol=2, prop=dict(size=18))
-plt.text(0.75, 3.35, "Top", size=20,
-         ha="center", va="center")
-plt.text(2.75, 3.35, "Bottom", size=20,
-         ha="center", va="center")
-plt.savefig('Congruency by alignment_dprime25tar_color new.tiff')
-plt.show()
 
 # boxplot
 sns.set_style("whitegrid")
@@ -1039,22 +1052,6 @@ plt.text(2.75, 3.75, "Bottom", size=20,
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
 plt.savefig('Congruency by alignment_dprime75tar.tiff')
-plt.show()
-
-# color graph
-fig,ax = plt.subplots(figsize=(12,10),dpi=100)
-plt.bar(r1, values1, yerr=errors1, width=barWidth, label = 'Congruent')
-plt.bar(r2, values2, yerr=errors2, width=barWidth, label = 'Incongruent')
-plt.ylim((0,3.5))
-plt.ylabel('d prime')
-ax.set_title('75% Cue', fontweight="bold", fontsize=24)
-plt.xticks([(r + barWidth/2) for r in range(4)], names)
-ax.legend(bbox_to_anchor=[0.5, 0.5, 0, 0.45], loc='upper center', ncol=2)
-plt.text(0.75, 3.35, "Top", size=20,
-         ha="center", va="center")
-plt.text(2.75, 3.35, "Bottom", size=20,
-         ha="center", va="center")
-plt.savefig('Congruency by alignment_dprime75tar_color.tiff')
 plt.show()
 
 # boxplot
@@ -1152,23 +1149,23 @@ barWidth = 0.4
 r1 = np.arange(4)
 r2 = [x + barWidth for x in r1]
 names = ['Aligned','Misaligned','Aligned','Misaligned']
-values1 = [np.mean(RTT_CA_25tar), np.mean(RTT_CM_25tar), np.mean(RTT_CA_75tar), np.mean(RTT_CM_75tar)]
-errors1 = [stats.sem(RTT_CA_25tar),stats.sem(RTT_CM_25tar), stats.sem(RTT_CA_75tar),stats.sem(RTT_CM_75tar)]
-values2 = [np.mean(RTT_IA_25tar), np.mean(RTT_IM_25tar), np.mean(RTT_IA_75tar), np.mean(RTT_IM_75tar)]
-errors2 = [stats.sem(RTT_IA_25tar),stats.sem(RTT_IM_25tar), stats.sem(RTT_IA_75tar),stats.sem(RTT_IM_75tar)]
+values1 = [np.mean(RTT_CA_25tar*1000), np.mean(RTT_CM_25tar*1000), np.mean(RTT_CA_75tar*1000), np.mean(RTT_CM_75tar*1000)]
+errors1 = [stats.sem(RTT_CA_25tar*1000),stats.sem(RTT_CM_25tar*1000), stats.sem(RTT_CA_75tar*1000),stats.sem(RTT_CM_75tar*1000)]
+values2 = [np.mean(RTT_IA_25tar*1000), np.mean(RTT_IM_25tar*1000), np.mean(RTT_IA_75tar*1000), np.mean(RTT_IM_75tar*1000)]
+errors2 = [stats.sem(RTT_IA_25tar*1000),stats.sem(RTT_IM_25tar*1000), stats.sem(RTT_IA_75tar*1000),stats.sem(RTT_IM_75tar*1000)]
 
 fig,ax = plt.subplots(figsize=(8,6),dpi=100)
 plt.bar(r1, values1, yerr=errors1, width=barWidth, color='lightgrey', edgecolor='white', label = 'Congruent')
 plt.bar(r2, values2, yerr=errors2, width=barWidth, color='black', edgecolor='white', label = 'Incongruent')
-plt.ylim((0,1.05))
-plt.ylabel('RT(s)')
+plt.ylim((0,1050))
+plt.ylabel('RT(ms)')
 plt.xticks([(r + barWidth/2) for r in range(4)], names)
 plt.legend(loc = "upper right", bbox_to_anchor=(1.08, 1.05), labelspacing=0.1)  # bbox_to_anchor indicates the position of the right corner of the legend relative to the whole box
-plt.text(1.75, 1.2, "Top", size=24,
+plt.text(1.75, 1200, "Top", size=24,
          ha="center", va="center")
-plt.text(0.75, 1.12, "25% cue target", size=20,
+plt.text(0.75, 1120, "25% cue target", size=20,
          ha="center", va="center")
-plt.text(2.75, 1.12, "75% cue target", size=20,
+plt.text(2.75, 1120, "75% cue target", size=20,
          ha="center", va="center")
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
@@ -1181,23 +1178,23 @@ barWidth = 0.4
 r1 = np.arange(4)
 r2 = [x + barWidth for x in r1]
 names = ['Aligned','Misaligned','Aligned','Misaligned']
-values1 = [np.mean(RTB_CA_25tar), np.mean(RTB_CM_25tar), np.mean(RTB_CA_75tar), np.mean(RTB_CM_75tar)]
-errors1 = [stats.sem(RTB_CA_25tar),stats.sem(RTB_CM_25tar), stats.sem(RTB_CA_75tar),stats.sem(RTB_CM_75tar)]
-values2 = [np.mean(RTB_IA_25tar), np.mean(RTB_IM_25tar), np.mean(RTB_IA_75tar), np.mean(RTB_IM_75tar)]
-errors2 = [stats.sem(RTB_IA_25tar),stats.sem(RTB_IM_25tar), stats.sem(RTB_IA_75tar),stats.sem(RTB_IM_75tar)]
+values1 = [np.mean(RTB_CA_25tar*1000), np.mean(RTB_CM_25tar*1000), np.mean(RTB_CA_75tar*1000), np.mean(RTB_CM_75tar*1000)]
+errors1 = [stats.sem(RTB_CA_25tar*1000),stats.sem(RTB_CM_25tar*1000), stats.sem(RTB_CA_75tar*1000),stats.sem(RTB_CM_75tar*1000)]
+values2 = [np.mean(RTB_IA_25tar*1000), np.mean(RTB_IM_25tar*1000), np.mean(RTB_IA_75tar*1000), np.mean(RTB_IM_75tar*1000)]
+errors2 = [stats.sem(RTB_IA_25tar*1000),stats.sem(RTB_IM_25tar*1000), stats.sem(RTB_IA_75tar*1000),stats.sem(RTB_IM_75tar*1000)]
 
 fig,ax = plt.subplots(figsize=(8,6),dpi=100)
 plt.bar(r1, values1, yerr=errors1, width=barWidth, color='lightgrey', edgecolor='white', label = 'Congruent')
 plt.bar(r2, values2, yerr=errors2, width=barWidth, color='black', edgecolor='white', label = 'Incongruent')
-plt.ylim((0,1.05))
-plt.ylabel('RT(s)')
+plt.ylim((0,1050))
+plt.ylabel('RT(ms)')
 plt.xticks([(r + barWidth/2) for r in range(4)], names)
 plt.legend(loc = "upper right", bbox_to_anchor=(1.08, 1.05), labelspacing=0.1)  # bbox_to_anchor indicates the position of the right corner of the legend relative to the whole box
-plt.text(1.75, 1.2, "Bottom", size=24,
+plt.text(1.75, 1200, "Bottom", size=24,
          ha="center", va="center")
-plt.text(0.75, 1.12, "25% cue target", size=20,
+plt.text(0.75, 1120, "25% cue target", size=20,
          ha="center", va="center")
-plt.text(2.75, 1.12, "75% cue target", size=20,
+plt.text(2.75, 1120, "75% cue target", size=20,
          ha="center", va="center")
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
@@ -1211,26 +1208,27 @@ barWidth = 0.4
 r1 = np.arange(4)
 r2 = [x + barWidth for x in r1]
 names = ['Aligned','Misaligned','Aligned','Misaligned']
-values1 = [np.mean(RTT_CA_25tar), np.mean(RTT_CM_25tar), np.mean(RTB_CA_25tar), np.mean(RTB_CM_25tar)]
-errors1 = [stats.sem(RTT_CA_25tar),stats.sem(RTT_CM_25tar), stats.sem(RTB_CA_25tar),stats.sem(RTB_CM_25tar)]
-values2 = [np.mean(RTT_IA_25tar), np.mean(RTT_IM_25tar), np.mean(RTB_IA_25tar), np.mean(RTB_IM_25tar)]
-errors2 = [stats.sem(RTT_IA_25tar),stats.sem(RTT_IM_25tar), stats.sem(RTB_IA_25tar),stats.sem(RTB_IM_25tar)]
+values1 = [np.mean(RTT_CA_25tar*1000), np.mean(RTT_CM_25tar*1000), np.mean(RTB_CA_25tar*1000), np.mean(RTB_CM_25tar*1000)]
+errors1 = [stats.sem(RTT_CA_25tar*1000),stats.sem(RTT_CM_25tar*1000), stats.sem(RTB_CA_25tar*1000),stats.sem(RTB_CM_25tar*1000)]
+values2 = [np.mean(RTT_IA_25tar*1000), np.mean(RTT_IM_25tar*1000), np.mean(RTB_IA_25tar*1000), np.mean(RTB_IM_25tar*1000)]
+errors2 = [stats.sem(RTT_IA_25tar*1000),stats.sem(RTT_IM_25tar*1000), stats.sem(RTB_IA_25tar*1000),stats.sem(RTB_IM_25tar*1000)]
 
 fig,ax = plt.subplots(figsize=(8,6),dpi=100)
 plt.bar(r1, values1, yerr=errors1, width=barWidth, color='lightgrey', edgecolor='white', label = 'Congruent')
 plt.bar(r2, values2, yerr=errors2, width=barWidth, color='black', edgecolor='white', label = 'Incongruent')
-plt.ylim((0,1.05))
-plt.ylabel('RT(s)')
+plt.ylim((0,1050))
+plt.ylabel('RT(ms)')
 plt.xticks([(r + barWidth/2) for r in range(4)], names)
 plt.legend(loc = "upper right", bbox_to_anchor=(1.08, 1.05), labelspacing=0.1)  # bbox_to_anchor indicates the position of the right corner of the legend relative to the whole box
-plt.text(1.75, 1.2, "25% cue", size=24,
+plt.text(1.75, 1200, "25% cue", size=24,
          ha="center", va="center")
-plt.text(0.75, 1.12, "Top", size=20,
+plt.text(0.75, 1120, "Top", size=20,
          ha="center", va="center")
-plt.text(2.75, 1.12, "Bottom", size=20,
+plt.text(2.75, 1120, "Bottom", size=20,
          ha="center", va="center")
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
+plt.tight_layout()
 plt.savefig('Congruency by alignment_RT25tar.tiff')
 plt.show()
 
@@ -1240,78 +1238,59 @@ barWidth = 0.4
 r1 = np.arange(4)
 r2 = [x + barWidth for x in r1]
 names = ['Aligned','Misaligned','Aligned','Misaligned']
-values1 = [np.mean(RTT_CA_75tar), np.mean(RTT_CM_75tar), np.mean(RTB_CA_75tar), np.mean(RTB_CM_75tar)]
-errors1 = [stats.sem(RTT_CA_75tar),stats.sem(RTT_CM_75tar), stats.sem(RTB_CA_75tar),stats.sem(RTB_CM_75tar)]
-values2 = [np.mean(RTT_IA_75tar), np.mean(RTT_IM_75tar), np.mean(RTB_IA_75tar), np.mean(RTB_IM_75tar)]
-errors2 = [stats.sem(RTT_IA_75tar),stats.sem(RTT_IM_75tar), stats.sem(RTB_IA_75tar),stats.sem(RTB_IM_75tar)]
+values1 = [np.mean(RTT_CA_75tar*1000), np.mean(RTT_CM_75tar*1000), np.mean(RTB_CA_75tar*1000), np.mean(RTB_CM_75tar*1000)]
+errors1 = [stats.sem(RTT_CA_75tar*1000),stats.sem(RTT_CM_75tar*1000), stats.sem(RTB_CA_75tar*1000),stats.sem(RTB_CM_75tar*1000)]
+values2 = [np.mean(RTT_IA_75tar*1000), np.mean(RTT_IM_75tar*1000), np.mean(RTB_IA_75tar*1000), np.mean(RTB_IM_75tar*1000)]
+errors2 = [stats.sem(RTT_IA_75tar*1000),stats.sem(RTT_IM_75tar*1000), stats.sem(RTB_IA_75tar*1000),stats.sem(RTB_IM_75tar*1000)]
 
 fig,ax = plt.subplots(figsize=(8,6),dpi=100)
 plt.bar(r1, values1, yerr=errors1, width=barWidth, color='lightgrey', edgecolor='white', label = 'Congruent')
 plt.bar(r2, values2, yerr=errors2, width=barWidth, color='black', edgecolor='white', label = 'Incongruent')
-plt.ylim((0,1.05))
-plt.ylabel('RT(s)')
+plt.ylim((0,1050))
+plt.ylabel('RT(ms)')
 plt.xticks([(r + barWidth/2) for r in range(4)], names)
 plt.legend(loc = "upper right", bbox_to_anchor=(1.08, 1.05), labelspacing=0.1)  # bbox_to_anchor indicates the position of the right corner of the legend relative to the whole box
-plt.text(1.75, 1.2, "75% cue", size=24,
+plt.text(1.75, 1200, "75% cue", size=24,
          ha="center", va="center")
-plt.text(0.75, 1.12, "Top", size=20,
+plt.text(0.75, 1120, "Top", size=20,
          ha="center", va="center")
-plt.text(2.75, 1.12, "Bottom", size=20,
+plt.text(2.75, 1120, "Bottom", size=20,
          ha="center", va="center")
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
+plt.tight_layout()
 plt.savefig('Congruency by alignment_RT75tar.tiff')
 plt.show()
 
-# descriptive
-"""
-Data[(Data['isCorrect'] == 1)].groupby(['Probability'])['reactionTime'].mean()
-Data[(Data['isCorrect'] == 1)].groupby(['Probability'])['reactionTime'].std()
-
-Data[(Data['isCorrect'] == 1)].groupby(['Alignment','Congruency'])['reactionTime'].mean()
-Data[(Data['isCorrect'] == 1)].groupby(['Alignment','Congruency'])['reactionTime'].std()
-"""
-
-a = Data[(Data['isCorrect'] == 1)].groupby(['Participant','Probability'])['reactionTime'].describe()    
-a.groupby(['Probability'])['mean'].describe() 
-
-a = Data[(Data['isCorrect'] == 1)].groupby(['Participant','Alignment','Congruency'])['reactionTime'].describe()    
-a.groupby(['Alignment','Congruency'])['mean'].describe() 
-
 # anova
 # four way: cue part, cue probability, congruency, alignment
-aovrm2way_RT = AnovaRM(Data[(Data['isCorrect'] == 1)], 'reactionTime', 'Participant', within = ['CuedHalf','Probability','Congruency', 'Alignment'], aggregate_func = 'mean')
-res2way_RT = aovrm2way_RT.fit()
-print (res2way_RT) 
-
 pandas2ri.activate()
 r_corRT = pandas2ri.py2ri(Data[(Data['isCorrect'] == 1)])
 
 model = afex.aov_ez('Participant', 'reactionTime', r_corRT, within = ['Probability','CuedHalf', 'Alignment','Congruency'])
 print(model)
 
-# Main effect of probability, congruency
-# No four-way interaction
-# Three-way interaction: cuedHalf x Probability x Alignment, p=.06
-# !!! Two-way interaction: Congruency x Alignment, p=.045
+# Main effect of probability, alignment, congruency
+# No four-way or three-way interaction
+# !!! Two-way interaction: Congruency x Alignment, p=.001
 
-# To examine three way: cuedHalf, probability, alignment
-# Top
-aovrm2way_RT_T = AnovaRM(DataT_cor, 'reactionTime', 'Participant', within = ['Probability', 'Alignment'], aggregate_func = 'mean')
-res2way_RT_T = aovrm2way_RT_T.fit()
-print (res2way_RT_T) 
-# Main effect of probability, no main effect of Alignment
-# No interaction between probability and alignment
+# main effect
+main_prob = emmeans.emmeans(model, 'Probability', contr = 'pairwise', adjust = 'bonferroni')
+print(main_prob)
 
+main_align = emmeans.emmeans(model, 'Alignment', contr = 'pairwise', adjust = 'bonferroni')
+print(main_align)
 
-# To examine three way: cuedHalf, probability, alignment
-# Bottom
-aovrm2way_RT_B = AnovaRM(DataB_cor, 'isCorrect', 'Participant', within = ['Probability', 'Alignment'], aggregate_func = 'mean')
-res2way_RT_B = aovrm2way_RT_B.fit()
-print (res2way_RT_B) 
-# Main effect of probability. No main effect of alignment!
-# No interaction between probability and alignment!! 
+# simple effect
+inter_congr_align = emmeans.emmeans(model, 'Alignment', by = 'Congruency', contr = 'pairwise', adjust = 'bonferroni')
+print(inter_congr_align)
 
+# descriptive
+a = Data[(Data['isCorrect'] == 1)].groupby(['Participant','Probability'])['reactionTime'].describe()    
+a.groupby(['Probability'])['mean'].describe() 
+
+a = Data[(Data['isCorrect'] == 1)].groupby(['Participant','Alignment','Congruency'])['reactionTime'].describe()    
+a.groupby(['Alignment','Congruency'])['mean'].describe() 
 
 
 """""""""""""""""""""""""""""""""""""""
@@ -1364,9 +1343,9 @@ IAS_IMS_RT_TB_25tar = IAS_IMS_RT_TB_25tar.append(pd.DataFrame(data = RTT_IMS_25t
 IAS_IMS_RT_TB_25tar = IAS_IMS_RT_TB_25tar.append(pd.DataFrame(data = RTB_IAS_25tar))  
 IAS_IMS_RT_TB_25tar = IAS_IMS_RT_TB_25tar.append(pd.DataFrame(data = RTB_IMS_25tar))
 
-IAS_IMS_RT_TB_25tar['CuedHalf'] = ['Top']*40 + ['Bottom']*40
-IAS_IMS_RT_TB_25tar['Alignment'] = ['Aligned']*20 + ['MisAligned']*20 + ['Aligned']*20 + ['MisAligned']*20
-IAS_IMS_RT_TB_25tar['participant'] = list(range(1,21)) * 4
+IAS_IMS_RT_TB_25tar['CuedHalf'] = ['Top']*64 + ['Bottom']*64
+IAS_IMS_RT_TB_25tar['Alignment'] = ['Aligned']*32 + ['MisAligned']*32 + ['Aligned']*32 + ['MisAligned']*32
+IAS_IMS_RT_TB_25tar['participant'] = list(range(1,33)) * 4
 
 # acc, 75% cue target
 IAS_IMS_RT_TB_75tar = pd.DataFrame(data = RTT_IAS_75tar)
@@ -1374,16 +1353,16 @@ IAS_IMS_RT_TB_75tar = IAS_IMS_RT_TB_75tar.append(pd.DataFrame(data = RTT_IMS_75t
 IAS_IMS_RT_TB_75tar = IAS_IMS_RT_TB_75tar.append(pd.DataFrame(data = RTB_IAS_75tar))
 IAS_IMS_RT_TB_75tar = IAS_IMS_RT_TB_75tar.append(pd.DataFrame(data = RTB_IMS_75tar))
 
-IAS_IMS_RT_TB_75tar['CuedHalf'] = ['Top']*40 + ['Bottom']*40
-IAS_IMS_RT_TB_75tar['Alignment'] = ['Aligned']*20 + ['MisAligned']*20 + ['Aligned']*20 + ['MisAligned']*20
-IAS_IMS_RT_TB_75tar['participant'] = list(range(1,21)) * 4
+IAS_IMS_RT_TB_75tar['CuedHalf'] = ['Top']*64 + ['Bottom']*64
+IAS_IMS_RT_TB_75tar['Alignment'] = ['Aligned']*32 + ['MisAligned']*32 + ['Aligned']*32 + ['MisAligned']*32
+IAS_IMS_RT_TB_75tar['participant'] = list(range(1,33)) * 4
 
 # combined acc data
 IAS_IMS_RT_TB = pd.DataFrame(data = IAS_IMS_RT_TB_25tar)
 IAS_IMS_RT_TB = IAS_IMS_RT_TB.append(pd.DataFrame(data = IAS_IMS_RT_TB_75tar))
-IAS_IMS_RT_TB['Probability'] = ['25cueTarget']*80 + ['75cueTarget']*80 
+IAS_IMS_RT_TB['Probability'] = ['25cueTarget']*128 + ['75cueTarget']*128 
 
-
+# anova
 pandas2ri.activate()
 r_IAS_IMS_RT = pandas2ri.py2ri(IAS_IMS_RT_TB)
 
@@ -1392,37 +1371,13 @@ print(model)
 # Main effect of probability, no effect of alignment
 # No interactions
 
-# post-hoc: main effect of alignment, RT(A) > RT(M)
-"""
-np.nanmean([RTT_IAS_25tar] + [RTB_IAS_25tar] + [RTT_IAS_75tar] + [RTB_IAS_75tar])
-np.nanstd([RTT_IAS_25tar] + [RTB_IAS_25tar] + [RTT_IAS_75tar] + [RTB_IAS_75tar])
-np.mean([RTT_IMS_25tar] + [RTB_IMS_25tar] + [RTT_IMS_75tar] + [RTB_IMS_75tar]) 
-np.std([RTT_IMS_25tar] + [RTB_IMS_25tar] + [RTT_IMS_75tar] + [RTB_IMS_75tar])
-"""
+# main effect 
+main_prob = emmeans.emmeans(model, 'Probability', contr = 'pairwise', adjust = 'bonferroni')
+print(main_prob)
 
-a = IAS_IMS_RT_TB.groupby(['participant','Alignment'])['reactionTime'].describe()    
-a.groupby(['Alignment'])['mean'].describe() 
-
-
-# post-hoc: main effect of probability, RT(75) < RT(25)
-"""
-np.nanmean([RTT_IAS_25tar] + [RTB_IAS_25tar] + [RTT_IMS_25tar] + [RTB_IMS_25tar])
-np.nanstd([RTT_IAS_25tar] + [RTB_IAS_25tar] + [RTT_IMS_25tar] + [RTB_IMS_25tar])
-np.mean([RTT_IAS_75tar] + [RTB_IAS_75tar] + [RTT_IMS_75tar] + [RTB_IMS_75tar])
-np.std([RTT_IAS_75tar] + [RTB_IAS_75tar] + [RTT_IMS_75tar] + [RTB_IMS_75tar])
-"""
-
+# descriptive
 a = IAS_IMS_RT_TB.groupby(['participant','Probability'])['reactionTime'].describe()    
 a.groupby(['Probability'])['mean'].describe() 
-
-a = IAS_IMS_RT_TB.groupby(['participant','CuedHalf'])['reactionTime'].describe()    
-a.groupby(['CuedHalf'])['mean'].describe() 
-
-
-"""
-Data[(Data['isCorrect'] == 1) &(Data['Congruency'] == 'I') & (Data['SameDifferent'] == 'S')].groupby(['Probability'])['reactionTime'].mean()
-Data[(Data['isCorrect'] == 1) &(Data['Congruency'] == 'I') & (Data['SameDifferent'] == 'S')].groupby(['Alignment'])['reactionTime'].mean()
-"""
 
 
 """""""""""
@@ -1536,9 +1491,9 @@ CAS_CMS_RT_TB_25tar = CAS_CMS_RT_TB_25tar.append(pd.DataFrame(data = RTT_CMS_25t
 CAS_CMS_RT_TB_25tar = CAS_CMS_RT_TB_25tar.append(pd.DataFrame(data = RTB_CAS_25tar))
 CAS_CMS_RT_TB_25tar = CAS_CMS_RT_TB_25tar.append(pd.DataFrame(data = RTB_CMS_25tar))
 
-CAS_CMS_RT_TB_25tar['CuedHalf'] = ['Top']*40 + ['Bottom']*40
-CAS_CMS_RT_TB_25tar['Alignment'] = ['Aligned']*20 + ['MisAligned']*20 + ['Aligned']*20 + ['MisAligned']*20
-CAS_CMS_RT_TB_25tar['participant'] = list(range(1,21)) * 4
+CAS_CMS_RT_TB_25tar['CuedHalf'] = ['Top']*64 + ['Bottom']*64
+CAS_CMS_RT_TB_25tar['Alignment'] = ['Aligned']*32 + ['MisAligned']*32 + ['Aligned']*32 + ['MisAligned']*32
+CAS_CMS_RT_TB_25tar['participant'] = list(range(1,33)) * 4
 
 # acc, 75% cue target
 CAS_CMS_RT_TB_75tar = pd.DataFrame(data = RTT_CAS_75tar)
@@ -1546,42 +1501,38 @@ CAS_CMS_RT_TB_75tar = CAS_CMS_RT_TB_75tar.append(pd.DataFrame(data = RTT_CMS_75t
 CAS_CMS_RT_TB_75tar = CAS_CMS_RT_TB_75tar.append(pd.DataFrame(data = RTB_CAS_75tar))
 CAS_CMS_RT_TB_75tar = CAS_CMS_RT_TB_75tar.append(pd.DataFrame(data = RTB_CMS_75tar))
 
-CAS_CMS_RT_TB_75tar['CuedHalf'] = ['Top']*40 + ['Bottom']*40
-CAS_CMS_RT_TB_75tar['Alignment'] = ['Aligned']*20 + ['MisAligned']*20 + ['Aligned']*20 + ['MisAligned']*20
-CAS_CMS_RT_TB_75tar['participant'] = list(range(1,21)) * 4
+CAS_CMS_RT_TB_75tar['CuedHalf'] = ['Top']*64 + ['Bottom']*64
+CAS_CMS_RT_TB_75tar['Alignment'] = ['Aligned']*32 + ['MisAligned']*32 + ['Aligned']*32 + ['MisAligned']*32
+CAS_CMS_RT_TB_75tar['participant'] = list(range(1,33)) * 4
 
 # combined acc data
 CAS_CMS_RT_TB = pd.DataFrame(data = CAS_CMS_RT_TB_25tar)
 CAS_CMS_RT_TB = CAS_CMS_RT_TB.append(pd.DataFrame(data = CAS_CMS_RT_TB_75tar))
-CAS_CMS_RT_TB['Probability'] = ['25cueTarget']*80 + ['75cueTarget']*80 
+CAS_CMS_RT_TB['Probability'] = ['25cueTarget']*128 + ['75cueTarget']*128 
 
-
+# anova
 pandas2ri.activate()
 r_CAS_CMS_RT = pandas2ri.py2ri(CAS_CMS_RT_TB)
 
 model = afex.aov_ez('participant', 'reactionTime', CAS_CMS_RT_TB, within = ['Probability','CuedHalf', 'Alignment'])
 print(model)
 # Main effect of probability and alignment
-# No interactions
+# Interactions between probability and alignment
 
-# post-hoc: main effect of alignment, RT(A) < RT(M)
-"""
-np.mean([RTT_CAS_25tar] + [RTB_CAS_25tar] + [RTT_CAS_75tar] + [RTB_CAS_75tar])
-np.std([RTT_CAS_25tar] + [RTB_CAS_25tar] + [RTT_CAS_75tar] + [RTB_CAS_75tar])
-np.mean([RTT_CMS_25tar] + [RTB_CMS_25tar] + [RTT_CMS_75tar] + [RTB_CMS_75tar]) 
-np.std([RTT_CMS_25tar] + [RTB_CMS_25tar] + [RTT_CMS_75tar] + [RTB_CMS_75tar])
-"""
+# main effect 
+main_prob = emmeans.emmeans(model, 'Probability', contr = 'pairwise', adjust = 'bonferroni')
+print(main_prob)
 
-a = CAS_CMS_RT_TB.groupby(['participant','Alignment'])['reactionTime'].describe()    
-a.groupby(['Alignment'])['mean'].describe() 
+main_align = emmeans.emmeans(model, 'Alignment', contr = 'pairwise', adjust = 'bonferroni')
+print(main_align)
 
-# post-hoc: main effect of probability, RT(75) < RT(25)
-"""
-np.mean([RTT_CAS_25tar] + [RTB_CAS_25tar] + [RTT_CMS_25tar] + [RTB_CMS_25tar])
-np.std([RTT_CAS_25tar] + [RTB_CAS_25tar] + [RTT_CMS_25tar] + [RTB_CMS_25tar])
-np.mean([RTT_CAS_75tar] + [RTB_CAS_75tar] + [RTT_CMS_75tar] + [RTB_CMS_75tar])
-np.std([RTT_CAS_75tar] + [RTB_CAS_75tar] + [RTT_CMS_75tar] + [RTB_CMS_75tar])
-"""
+# simple effect
+inter_prob_align = emmeans.emmeans(model, 'Alignment', by = 'Probability', contr = 'pairwise', adjust = 'bonferroni')
+print(inter_prob_align)
+
+# descriptive
+a = CAS_CMS_RT_TB.groupby(['participant','Alignment','Probability'])['reactionTime'].describe()    
+a.groupby(['Alignment','Probability'])['mean'].describe() 
 
 
 """""""""""
@@ -1684,33 +1635,8 @@ plt.text(2.75, 1150, "Same incongruent", size=20,
          ha="center", va="center")
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
+plt.tight_layout()
 plt.savefig('Traditional + Complementary_RT_25tar.tiff')
-plt.show()
-
-# color plot
-barWidth = 0.4
-r1 = np.arange(4)
-r2 = [x + barWidth for x in r1]
-names = ['Same Congruent','Same Incongruent','Same Congruent','Same Incongruent']
-values1 = [np.mean(RTT_CAS_25tar*1000), np.nanmean(RTT_IAS_25tar*1000), np.mean(RTB_CAS_25tar*1000), np.mean(RTB_IAS_25tar*1000)]
-errors1 = [stats.sem(RTT_CAS_25tar*1000),stats.sem(RTT_IAS_25tar*1000,nan_policy='omit'), stats.sem(RTB_CAS_25tar*1000),stats.sem(RTB_IAS_25tar*1000)]
-values2 = [np.mean(RTT_CMS_25tar*1000), np.mean(RTT_IMS_25tar*1000), np.mean(RTB_CMS_25tar*1000), np.mean(RTB_IMS_25tar*1000)]
-errors2 = [stats.sem(RTT_CMS_25tar*1000),stats.sem(RTT_IMS_25tar*1000), stats.sem(RTB_CMS_25tar*1000),stats.sem(RTB_IMS_25tar*1000)]
-
-fig,ax = plt.subplots(figsize=(8,6),dpi=100)
-plt.bar(r1, values1, yerr=errors1, width=barWidth, label = 'Aligned')
-plt.bar(r2, values2, yerr=errors2, width=barWidth, label = 'Misaligned')
-plt.ylim((0,1150))
-plt.ylabel('RT(ms)')
-ax.set_title('25% cue', fontweight="bold", fontsize=24)
-plt.xticks([(r + barWidth/2) for r in range(4)], names)
-ax.tick_params(axis='x', which='major', labelsize=13)
-ax.legend(bbox_to_anchor=[0.5, 0.5, 0, 0.45], loc='upper center', ncol=2, prop=dict(size=18))
-plt.text(0.75, 1110, "Top", size=20,
-         ha="center", va="center")
-plt.text(2.75, 1110, "Bottom", size=20,
-         ha="center", va="center")
-plt.savefig('Traditional + Complementary_RT_25tar_color.tiff')
 plt.show()
 
 
@@ -1739,35 +1665,9 @@ plt.text(2.75, 1150, "Same incongruent", size=20,
          ha="center", va="center")
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
+plt.tight_layout()
 plt.savefig('Traditional + Complementary_RT_75tar.tiff')
 plt.show()
-
-# color plot
-barWidth = 0.4
-r1 = np.arange(4)
-r2 = [x + barWidth for x in r1]
-names = ['Same Congruent','Same Incongruent','Same Congruent','Same Incongruent']
-values1 = [np.mean(RTT_CAS_75tar), np.mean(RTT_IAS_75tar), np.mean(RTB_CAS_75tar), np.mean(RTB_IAS_75tar)]
-errors1 = [stats.sem(RTT_CAS_75tar),stats.sem(RTT_IAS_75tar), stats.sem(RTB_CAS_75tar),stats.sem(RTB_IAS_75tar)]
-values2 = [np.mean(RTT_CMS_75tar), np.mean(RTT_IMS_75tar), np.mean(RTB_CMS_75tar), np.mean(RTB_IMS_75tar)]
-errors2 = [stats.sem(RTT_CMS_75tar),stats.sem(RTT_IMS_75tar), stats.sem(RTB_CMS_75tar),stats.sem(RTB_IMS_75tar)]
-
-fig,ax = plt.subplots(figsize=(8,6),dpi=100)
-plt.bar(r1, values1, yerr=errors1, width=barWidth, label = 'Aligned')
-plt.bar(r2, values2, yerr=errors2, width=barWidth, label = 'Misaligned')
-plt.ylim((0,1.15))
-plt.ylabel('RT(s)')
-ax.set_title('75% cue', fontweight="bold", fontsize=24)
-plt.xticks([(r + barWidth/2) for r in range(4)], names)
-ax.tick_params(axis='x', which='major', labelsize=13)
-ax.legend(bbox_to_anchor=[0.5, 0.5, 0, 0.45], loc='upper center', ncol=2, prop=dict(size=18))
-plt.text(0.75, 1.11, "Top", size=20,
-         ha="center", va="center")
-plt.text(2.75, 1.11, "Bottom", size=20,
-         ha="center", va="center")
-plt.savefig('Traditional + Complementary_RT_75tar_color.tiff')
-plt.show()
-
 
 
 """
@@ -1776,17 +1676,11 @@ save data
 """
 # save the file to csv file
 Data.to_csv('composite task_cue probability.csv', sep='\t')
-CAS_CMS_acc_TB_25tar.to_csv('acc_Same congruent25tar_long.csv', sep='\t')
-IAS_IMS_acc_TB_25tar.to_csv('acc_Same incongruent25tar_long.csv', sep='\t')
 
-CAS_CMS_acc_TB_75tar.to_csv('acc_Same congruent75tar_long.csv', sep='\t')
-IAS_IMS_acc_TB_75tar.to_csv('acc_Same incongruent75tar_long.csv', sep='\t')
+dprime_long.to_csv('dprime_composite task.csv', sep='\t')
 
-IAS_IMS_RT_TB_25tar.to_csv('RT_Same incongruent25tar_long.csv', sep='\t')
-IAS_IMS_RT_TB_25tar.to_csv('RT_Same incongruent25tar_long.csv', sep='\t')
+CAS_CMS_acc_TB.to_csv('acc_Same congruent_long.csv', sep='\t')
+IAS_IMS_acc_TB.to_csv('acc_Same incongruent_long.csv', sep='\t')
 
-IAS_IMS_RT_TB_25tar.to_csv('RT_Same incongruent25tar_long.csv', sep='\t')
-IAS_IMS_RT_TB_25tar.to_csv('RT_Same incongruent25tar_long.csv', sep='\t')
-
-dprime25tar_long.to_csv('dprime_composite task_cue25tar', sep='\t')
-dprime75tar_long.to_csv('dprime_composite task_cue75tar', sep='\t')
+CAS_CMS_RT_TB.to_csv('RT_Same congruent_long.csv', sep='\t')
+IAS_IMS_RT_TB.to_csv('RT_Same incongruent_long.csv', sep='\t')
