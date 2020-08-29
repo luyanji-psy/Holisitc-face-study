@@ -25,6 +25,7 @@ library(tidyverse)
 library(readxl)
 library(lme4)
 library(lmerTest)
+library(optimx)
 library(emmeans)
 
 folder_lmm <- "lmm_output"
@@ -76,7 +77,8 @@ df_tidy <- df_raw %>%
          Cue = factor(Cue, levels = c("top", "bottom")),
          Congruency = as_factor(Congruency),
          Alignment = as_factor(Alignment),
-         SameDifferent = factor(SameDifferent, levels = c("same", "different")))
+         SameDifferent = factor(SameDifferent, levels = c("same", "different")),
+         Probability = as_factor(Probability))
 
 ```
 
@@ -95,24 +97,15 @@ contrasts(df_tidy$SameDifferent) <- MASS::contr.sdif(nlevels(df_tidy$SameDiffere
 # set successive difference coding for random effects
 df_lmm <- df_tidy %>% 
   mutate(
-    Cue_C = if_else(Cue == "top", -.5, .5),
     Con_C = if_else(Congruency == "congruent", -.5, .5),
     Ali_C = if_else(Alignment == "aligned", -.5, .5),
     Sam_C = if_else(SameDifferent == "same", -.5, .5),
     
-    Cue_Con = Cue_C * Con_C,
-    Cue_Ali = Cue_C * Ali_C,
-    Cue_Sam = Cue_C * Sam_C,
     Con_Ali = Con_C * Ali_C,
     Con_Sam = Con_C * Sam_C,
     Ali_Sam = Ali_C * Sam_C,
     
-    Cue_Con_Ali = Cue_Con * Ali_C,
-    Cue_Con_Sam = Cue_Con * Sam_C,
-    Cue_Ali_Sam = Cue_Ali * Sam_C,
-    Con_Ali_Sam = Con_Ali * Sam_C,
-    
-    Cue_Con_Ali_Sam = Cue_Con_Ali * Sam_C
+    Con_Ali_Sam = Con_Ali * Sam_C
   )
 
 # save the data (for fitting model in cluster)
@@ -122,36 +115,51 @@ save(df_lmm, file = file.path("data", "df_lmm.RData"))
 
 
 # Responses (d')
-## The maximal model
+## Fitting the generalized mixed models
+### The maximal model
 ```{r resp max}
 
-  # glmm_resp_zcp <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-  #                          (Cue * Congruency * Alignment * SameDifferent | Participant),
-  #                        family = binomial("probit"),
-  #                        data = df_tidy,
-  #                        verbose = TRUE,
-  #                        control = glmerControl(optCtrl = list(maxfun = 1e7))
+file_resp_max <- file.path(folder_lmm, "Resp_lmm_max.RData")
+
+# fit the max model
+if (!file.exists(file_resp_max)) {
+  glmm_resp_max <- glmer(
+    isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
+      (Congruency * Alignment * SameDifferent | Participant), # Con_Ali_Sam
+    family = binomial(link = "probit"),
+    data = df_lmm,
+    control = glmerControl(optimizer = "optimx", # calc.derivs = FALSE,
+                           optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE))
+  )
+
+  save(glmm_resp_max, file = file_resp_max)
+} else {
+  load(file_resp_max)
+}
+
+print(summary(glmm_resp_max), corr = FALSE)
+
 ```
 
-## The zero-correlation-parameter model
+### The zero-correlation-parameter model
 ```{r resp zcp}
 
 file_resp_zcp <- file.path(folder_lmm, "Resp_lmm_zcp.RData")
 
 # fit the zcp model
 if (!file.exists(file_resp_zcp)) {
-  glmm_resp_zcp <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-                           (Cue_C + Con_C + Ali_C + Sam_C + 
-                              Cue_Con + Cue_Ali + Cue_Sam + Con_Ali + Con_Sam + Ali_Sam +
-                              Cue_Con_Ali + Cue_Con_Sam + Cue_Ali_Sam + Con_Ali_Sam + 
-                              Cue_Con_Ali_Sam || Participant),
-                         family = binomial(link = "probit"),
-                         data = df_lmm,
-                         verbose = TRUE,
-                         control = glmerControl(optCtrl = list(maxfun = 1e7))
+  glmm_resp_zcp <- glmer(
+    isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
+      (Con_C + Ali_C + Sam_C + 
+         Con_Ali + Con_Sam + Ali_Sam +
+         Con_Ali_Sam || Participant),
+    family = binomial(link = "probit"),
+    data = df_lmm,
+    control = glmerControl(optimizer = "optimx", # calc.derivs = FALSE,
+                           optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE))
   )
   
-  save(glmm_resp_zcp, file = file_resp_zcp)
+  # save(glmm_resp_zcp, file = file_resp_zcp)
 } else {
   load(file_resp_zcp)
 }
@@ -160,7 +168,7 @@ print(summary(glmm_resp_zcp), corr = FALSE)
 
 ```
 
-## The reduced model
+### The reduced model
 ```{r PCA analysis for resp zcp lmm}
 summary(rePCA(glmm_resp_zcp))
 ```
@@ -170,16 +178,18 @@ file_resp_rdc <- file.path(folder_lmm, "Resp_lmm_rdc.RData")
 
 # fit the zcp model
 if (!file.exists(file_resp_rdc)) {
-glmm_resp_rdc <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-                         (Cue_C + Con_C + Sam_C + # Ali_C + 
-                            Cue_Con + Cue_Sam + Con_Ali + Con_Sam + Ali_Sam + # Cue_Ali + 
-                            Cue_Con_Ali + Cue_Con_Sam + Cue_Ali_Sam # + Con_Ali_Sam + 
-                          || Participant), # Cue_Con_Ali_Sam
-                       family = binomial(link = "probit"),
-                       data = df_lmm,
-                       verbose = TRUE,
-                       control = glmerControl(optCtrl = list(maxfun = 1e7))
-)
+  glmm_resp_rdc <- glmer(
+    isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
+      (Con_C + Sam_C + # Ali_C + 
+         Con_Ali + Con_Sam + Ali_Sam # +
+       || Participant), # Con_Ali_Sam
+    family = binomial(link = "probit"),
+    data = df_lmm,
+    control = glmerControl(optimizer = "optimx", # calc.derivs = FALSE,
+                           optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE))
+  )
+  
+  # save(glmm_resp_rdc, file = file_resp_rdc)
 } else {
   load(file_resp_rdc)
 }
@@ -187,22 +197,24 @@ glmm_resp_rdc <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent 
 print(summary(glmm_resp_rdc), corr = FALSE)
 ```
 
-## The extended model
+### The extended model
 ```{r resp exteded model}
 file_resp_etd <- file.path(folder_lmm, "Resp_lmm_etd.RData")
 
 # fit the etd model
 if (!file.exists(file_resp_etd)) {
-glmm_resp_etd <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-                         (Cue_C + Con_C + Sam_C + # Ali_C + 
-                            Cue_Con + Cue_Sam + Con_Ali + Con_Sam + Ali_Sam + # Cue_Ali + 
-                            Cue_Con_Ali + Cue_Con_Sam + Cue_Ali_Sam # + Con_Ali_Sam + 
-                          | Participant), # Cue_Con_Ali_Sam
-                       family = binomial(link = "probit"),
-                       data = df_lmm,
-                       verbose = TRUE,
-                       control = glmerControl(optCtrl = list(maxfun = 1e7))
-)
+  glmm_resp_etd <- glmer(
+    isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
+      (Con_C + Sam_C + # Ali_C + 
+         Con_Ali + Con_Sam + Ali_Sam # +
+       | Participant), # Con_Ali_Sam
+    family = binomial(link = "probit"),
+    data = df_lmm,
+    control = glmerControl(optimizer = "optimx", # calc.derivs = FALSE,
+                           optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE))
+  )
+  
+  # save(glmm_resp_etd, file = glmm_resp_etd)
 } else {
   load(file_resp_etd)
 }
@@ -210,197 +222,34 @@ glmm_resp_etd <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent 
 print(summary(glmm_resp_etd), corr = FALSE)
 ```
 
-```{r}
-# restart from the results of extended model
+### The optimal model
 
-file_resp_etd1 <- file.path(folder_lmm, "Resp_lmm_etd1.RData")
+```{r comapre etd and rdc}
+# compare the extended and reduced model
+anova(glmm_resp_etd, glmm_resp_rdc, refit = FALSE)
+```
 
-# fit the etd model
-if (!file.exists(file_resp_etd1)) {
-  ss <- getME(glmm_resp_etd, c("theta","fixef"))
-  glmm_resp_etd1 <- update(glmm_resp_etd,start=ss,control=glmerControl(optCtrl=list(maxfun=1e7)))
-} else {
-  load(file_resp_etd1)
-}
+According to BIC, the extended model (`glmm_resp_etd`) explained the data better than the reduced model (`glmm_resp_rdc`) and, therefore, the extended model is used as the optimal model.
 
-print(summary(glmm_resp_etd1), corr = FALSE)
+```{r the optimal model}
+glmm_resp_opt <- glmm_resp_etd
 
+print(summary(glmm_resp_opt), corr = FALSE)
 ```
 
 
-```{r}
-# restart from the results of extended1 model
+## Estimated marginal means
+### Estimated marginal means for hit and correct rejection
+```{r emm}
+emm_resp <- emmeans(glmm_resp_opt, ~ Cue + Congruency + Alignment + SameDifferent)
 
-file_resp_etd2 <- file.path(folder_lmm, "Resp_lmm_etd2.RData")
-
-# fit the etd model
-if (!file.exists(file_resp_etd2)) {
-  ss1 <- getME(glmm_resp_etd1, c("theta","fixef"))
-  glmm_resp_etd2 <- update(glmm_resp_etd,start=ss1,control=glmerControl(optCtrl=list(maxfun=1e10)))
-} else {
-  load(file_resp_etd2)
-}
-
-print(summary(glmm_resp_etd2), corr = FALSE)
+emm_resp
 
 ```
 
-As the extended model (`glmm_resp_etd2`) failed to converge and its gradient was even larger than `glmm_resp_etd1`, the random effects whose variance is the smallest in `glmm_resp_etd` (i.e., `Con_Sam`) is removed, resulting in the updated extended model.
-
-```{r resp exteded3 model}
-file_resp_etd3 <- file.path(folder_lmm, "Resp_lmm_etd3.RData")
-
-# fit the etd model
-if (!file.exists(file_resp_etd3)) {
-glmm_resp_etd3 <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-                         (Cue_C + Con_C + Sam_C + # Ali_C + 
-                            Cue_Con + Cue_Sam + Con_Ali + Ali_Sam + # Cue_Ali + Con_Sam + 
-                            Cue_Con_Ali + Cue_Con_Sam + Cue_Ali_Sam # + Con_Ali_Sam + 
-                          | Participant), # Cue_Con_Ali_Sam
-                       family = binomial(link = "probit"),
-                       data = df_lmm,
-                       verbose = TRUE,
-                       control = glmerControl(optCtrl = list(maxfun = 1e10))
-)
-} else {
-  load(file_resp_etd3)
-}
-
-print(summary(glmm_resp_etd3), corr = FALSE)
-```
-
-As `glmm_resp_etd3` did not converge, the random effects (slopes) whose variances are the smallest (i.e., `Con_Ali`) is removed, making the updated extended model.
-
-```{r resp exteded4 model}
-file_resp_etd4 <- file.path(folder_lmm, "Resp_lmm_etd4.RData")
-
-# fit the etd model
-if (!file.exists(file_resp_etd4)) {
-glmm_resp_etd4 <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-                         (Cue_C + Con_C + Sam_C + # Ali_C + 
-                            Cue_Con + Cue_Sam + Ali_Sam + # Cue_Ali + Con_Ali + Con_Sam + 
-                            Cue_Con_Ali + Cue_Con_Sam + Cue_Ali_Sam # + Con_Ali_Sam + 
-                          | Participant), # Cue_Con_Ali_Sam
-                       family = binomial(link = "probit"),
-                       data = df_lmm,
-                       verbose = TRUE,
-                       control = glmerControl(optCtrl = list(maxfun = 1e10))
-)
-} else {
-  load(file_resp_etd4)
-}
-
-print(summary(glmm_resp_etd4), corr = FALSE)
-```
-
-```{r resp exteded5 model}
-file_resp_etd5 <- file.path(folder_lmm, "Resp_lmm_etd5.RData")
-
-# fit the etd model
-if (!file.exists(file_resp_etd5)) {
-glmm_resp_etd5 <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-                         (Cue_C + Con_C + Sam_C + # Ali_C + 
-                            Cue_Con + Cue_Sam + Ali_Sam + # Cue_Ali + Con_Ali + Con_Sam + 
-                            Cue_Con_Sam + Cue_Ali_Sam # + Cue_Con_Ali + Con_Ali_Sam + 
-                          | Participant), # Cue_Con_Ali_Sam
-                       family = binomial(link = "probit"),
-                       data = df_lmm,
-                       verbose = TRUE,
-                       control = glmerControl(optCtrl = list(maxfun = 1e10))
-)
-} else {
-  load(file_resp_etd5)
-}
-
-print(summary(glmm_resp_etd5), corr = FALSE)
-```
-
-```{r resp extededx model}
-file_resp_etdx <- file.path(folder_lmm, "Resp_lmm_etdx.RData")
-
-# fit the etd model
-if (!file.exists(file_resp_etdx)) {
-glmm_resp_etdx <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-                         (0 + Cue_C + Con_C + Sam_C + # Ali_C + 
-                            Cue_Con + Cue_Sam + Con_Ali + Ali_Sam + # Cue_Ali + Con_Sam + 
-                            Cue_Con_Ali + Cue_Con_Sam + Cue_Ali_Sam # + Con_Ali_Sam + 
-                          | Participant), # Cue_Con_Ali_Sam
-                       family = binomial(link = "probit"),
-                       data = df_lmm,
-                       verbose = TRUE,
-                       control = glmerControl(optCtrl = list(maxfun = 1e10))
-)
-} else {
-  load(file_resp_etdx)
-}
-
-print(summary(glmm_resp_etdx), corr = FALSE)
-```
+### Estimated marginal means for d'
 
 
-```{r resp extendedx1 model}
-file_resp_etdx1 <- file.path(folder_lmm, "Resp_lmm_etdx1.RData")
 
-# fit the etd model
-if (!file.exists(file_resp_etdx1)) {
-glmm_resp_etdx1 <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-                         (0 + Cue_C + Con_C + Sam_C + # Ali_C + 
-                            Cue_Con + Cue_Sam + Ali_Sam + # Cue_Ali + Con_Sam + Con_Ali + 
-                            Cue_Con_Ali + Cue_Con_Sam + Cue_Ali_Sam # + Con_Ali_Sam + 
-                          | Participant), # Cue_Con_Ali_Sam
-                       family = binomial(link = "probit"),
-                       data = df_lmm,
-                       verbose = TRUE,
-                       control = glmerControl(optCtrl = list(maxfun = 1e10))
-)
-} else {
-  load(file_resp_etdx1)
-}
 
-print(summary(glmm_resp_etdx1), corr = FALSE)
-```
-
-```{r resp extendedx2 model}
-file_resp_etdx2 <- file.path(folder_lmm, "Resp_lmm_etdx2.RData")
-
-# fit the etd model
-if (!file.exists(file_resp_etdx2)) {
-glmm_resp_etdx2 <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-                         (0 + Cue_C + Con_C + Sam_C + # Ali_C + 
-                            Cue_Con + Cue_Sam + Ali_Sam + # Cue_Ali + Con_Sam + Con_Ali + 
-                            Cue_Con_Sam + Cue_Ali_Sam # Cue_Con_Ali + Con_Ali_Sam + 
-                          | Participant), # Cue_Con_Ali_Sam
-                       family = binomial(link = "probit"),
-                       data = df_lmm,
-                       verbose = TRUE,
-                       control = glmerControl(optCtrl = list(maxfun = 1e10))
-)
-} else {
-  load(file_resp_etdx2)
-}
-
-print(summary(glmm_resp_etdx2), corr = FALSE)
-```
-
-```{r resp extendedx3 model}
-file_resp_etdx3 <- file.path(folder_lmm, "Resp_lmm_etdx3.RData")
-
-# fit the etd model
-if (!file.exists(file_resp_etdx3)) {
-glmm_resp_etdx3 <- glmer(isCorrect ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-                         (0 + Cue_C + Con_C + Sam_C + # Ali_C + 
-                            Cue_Con + Cue_Sam + Ali_Sam + # Cue_Ali + Con_Sam + Con_Ali + 
-                            Cue_Con_Sam + Cue_Ali_Sam # Cue_Con_Ali + Con_Ali_Sam + 
-                          | Participant), # Cue_Con_Ali_Sam
-                       family = binomial(link = "probit"),
-                       data = df_lmm,
-                       verbose = TRUE,
-                       control = glmerControl(optCtrl = list(maxfun = 1e10))
-)
-} else {
-  load(file_resp_etdx3)
-}
-
-print(summary(glmm_resp_etdx3), corr = FALSE)
-```
 
