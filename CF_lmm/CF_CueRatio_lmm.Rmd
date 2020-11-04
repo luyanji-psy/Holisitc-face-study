@@ -3,7 +3,7 @@ title: "CF_CueRatio_lmm"
 author: "Haiyang Jin (hjin317@aucklanduni.ac.nz)"
 date: "`r format(Sys.time(), '%d-%m-%Y')`"
 output: 
-  pdf_document:
+  html_document:
     number_sections: true
     toc: true
 version: "1.0"
@@ -16,6 +16,7 @@ version: "1.0"
 knitr::opts_chunk$set(echo = FALSE)
 knitr::opts_chunk$set(include = TRUE)
 knitr::opts_chunk$set(warning = FALSE)
+options(width = 1200)
 # knitr::opts_chunk$set(fig.width=7, fig.asp =0.618) 
 # knitr::opts_chunk$set(comment = "#") # (NA, to remove all hashes)
 
@@ -49,7 +50,7 @@ df_raw_E2 <- sapply(file2_list, read_excel, na = "NA", simplify = FALSE) %>% bin
 df_raw_E1_temp <- df_raw_E1 %>% 
   select(-c(SubTrial)) %>% 
   mutate(Probability = 0.5,
-         targetDuration = 999,
+         targetDuration = 200, # fix a bug in exp
          Participant = Participant + 100)
 
 df_raw_E2_temp <- df_raw_E2 %>% 
@@ -68,7 +69,7 @@ df_raw
 ```{r select certain rows and columns from the data, and calculate the Z value for reaction times}
 
 df_tidy <- df_raw %>% 
-  filter(!is.na(isCorrect)) %>%  # remove NA trials
+  filter(!is.na(thisResponse)) %>%  # remove NA trials based on responses
   mutate(Cue = if_else(CuedHalf == "T", "top", "bottom"),
          Congruency = if_else(Congruency == "C", "congruent", "incongruent"),
          Alignment = if_else(Alignment == "A", "aligned", "misaligned"),
@@ -79,7 +80,8 @@ df_tidy <- df_raw %>%
          Alignment = as_factor(Alignment),
          SameDifferent = factor(SameDifferent, levels = c("same", "different")),
          Probability = as_factor(Probability),
-         Resp = if_else(thisResponse == "S", 1, 0))
+         Resp = if_else(thisResponse == "S", 1, 0),
+         RT = round(reactionTime * 1000+200)) # plus the duration of target faces
 
 ```
 
@@ -87,6 +89,17 @@ df_tidy <- df_raw %>%
 + Congruency: congruent vs. incongruent
 + Alignment: aligned vs. misaligned
 + SameDifferent: same vs. different
+
+
+```{r}
+# Trial numbers in each condition
+df_tidy %>% 
+  group_by(Participant) %>% 
+  summarize(nTotal = n()) 
+
+# For 3 participants in E1, one trail was removed due to no response recorded.
+```
+
 
 ```{r}
 # set successive difference coding for fixed effects
@@ -188,6 +201,7 @@ summary(rePCA(glmm_resp_zcp))
 file_resp_rdc <- file.path(folder_lmm, "Resp_lmm_rdc.RData")
 
 # fit the zcp model
+# three random effects were removed
 if (!file.exists(file_resp_rdc)) {
   glmm_resp_rdc <- glmer(
     Resp ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
