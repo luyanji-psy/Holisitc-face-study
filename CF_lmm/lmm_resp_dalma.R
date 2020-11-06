@@ -141,19 +141,19 @@ load("df_lmm.RData")
 # message("etd4 is finished.")
 
 ######### update etd model as etd5
-message("Fitting glmm_resp_etd5...")
-glmm_resp_etd5 <- glmer(
-    Resp ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
-        (0 + Sam_C + # Con_C + Ali_C + Cue_C + 
-             Cue_Sam + Con_Sam + # Cue_Con + Con_Ali + Ali_Sam + Cue_Ali + 
-             Cue_Con_Sam  # Cue_Con_Ali + Cue_Ali_Sam + Con_Ali_Sam + +
-         | Participant), # Cue_Con_Ali_Sam
-    family = binomial(link = "probit"),
-    data = df_lmm,
-    control = glmerControl(optimizer = "optimx", # calc.derivs = FALSE,
-                           optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE))
-)
-save(glmm_resp_etd5, file = "Resp_lmm_etd5.RData")
-message("etd5 is finished.")
+# message("Fitting glmm_resp_etd5...")
+# glmm_resp_etd5 <- glmer(
+#     Resp ~ Cue * Congruency * Alignment * SameDifferent + Probability + 
+#         (0 + Sam_C + # Con_C + Ali_C + Cue_C + 
+#              Cue_Sam + Con_Sam + # Cue_Con + Con_Ali + Ali_Sam + Cue_Ali + 
+#              Cue_Con_Sam  # Cue_Con_Ali + Cue_Ali_Sam + Con_Ali_Sam + +
+#          | Participant), # Cue_Con_Ali_Sam
+#     family = binomial(link = "probit"),
+#     data = df_lmm,
+#     control = glmerControl(optimizer = "optimx", # calc.derivs = FALSE,
+#                            optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE))
+# )
+# save(glmm_resp_etd5, file = "Resp_lmm_etd5.RData")
+# message("etd5 is finished.")
 
 toc()
