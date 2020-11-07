@@ -423,15 +423,13 @@ print(summary(glmm_resp_opt), corr = FALSE)
 ## Estimated marginal means
 ### Estimated marginal means for hit and false alarm
 ```{r emm}
-emm_resp <- emmeans(glmm_resp_rdc2, ~ Cue + Congruency + Alignment + SameDifferent)
-
-emm_resp
+(emm_resp <- emmeans(glmm_resp_rdc2, ~ Alignment + Congruency + Cue + SameDifferent))
 ```
 
 ### Estimated marginal means for d'
 ```{r message=FALSE}
-emm_d <- contrast(emm_resp, method = "pairwise", simple = "SameDifferent", infer = c(TRUE, FALSE))
-emm_d[1:8]
+emm_d <- contrast(emm_resp, method = "pairwise", simple = "SameDifferent")
+summary(emm_d[1:8], infer = c(TRUE, FALSE))
 ```
 
 ```{r message=FALSE}
@@ -441,15 +439,15 @@ emmip(emm_d, Congruency ~ Alignment | Cue, CIs = TRUE)
 #### Composite effects
 Composite face effects for top and bottom parts:
 ```{r message=FALSE}
-emm_d_cf <- contrast(emm_resp, interaction = "pairwise", by = "Cue", infer = TRUE)
-emm_d_cf[1:2]
+emm_d_cf <- contrast(emm_resp, interaction = "pairwise", by = "Cue")
+summary(emm_d_cf[1:2], infer = TRUE)
 ```
 
 #### Facilitation and interference
 ```{r message=FALSE}
 # Sensitivity d'
-emm_d_fi <- contrast(emm_resp, interaction = "pairwise", by = c("Cue", "Congruency"), infer=TRUE, adjust = "Tukey")
-emm_d_fi[1:4]
+emm_d_fi <- contrast(emm_resp, interaction = "pairwise", by = c("Cue", "Congruency"), adjust = "Tukey")
+summary(emm_d_fi[1:4], infer=TRUE)
 ```
 
 ```{r message=FALSE}

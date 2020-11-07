@@ -5,7 +5,7 @@ library(tictoc)
 tic()
 
 # load the data
-load("df_lmm_rt.RData")
+# load("df_lmm_rt.RData")
 
 ######### max model #########
 
@@ -88,5 +88,14 @@ load("df_lmm_rt.RData")
 # glmm_rt_opt <- glmm_rt_etd2
 # emm_rt <- emmeans(glmm_rt_opt, ~ Cue + Congruency + Alignment)
 # save(emm_rt, file = "rt_emm.RData")
+
+
+######### emmeans for scf #########
+load("df_lmm_rt_scf.RData")
+library(emmeans)
+load("rt_scf_lmm_etd.RData")
+glmm_rt_scf_opt <- glmm_rt_scf_etd
+emm_rt_scf <- emmeans(glmm_rt_scf_opt, ~ Cue + Alignment)
+save(emm_rt_scf, file = "rt_scf_emm.RData")
 
 toc()
