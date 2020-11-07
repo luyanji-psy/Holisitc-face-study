@@ -458,25 +458,23 @@ emmip(emm_d_fi[1:4], ~ Congruency | Cue, CIs = TRUE) +
   geom_hline(yintercept = 0, linetype = "dashed")
 ```
 
+#### SCF analysis
 ```{r message=FALSE}
 # Accuracy for same trials only
-emm_resp_scf <- contrast(regrid(emm_resp), method = "pairwise", simple = "Alignment", infer = TRUE)
-emm_resp_scf[1:4]
+emm_resp_scf <- contrast(regrid(emm_resp), method = "pairwise", simple = "Alignment")
+summary(emm_resp_scf[1:4], infer = TRUE)
 
-# summary(temp[1:2], side = ">")
-# summary(temp[3:4], side = "<")
 ```
 
 ```{r}
 # Accuracy for different trials only
-emm_resp_scf[5:8]
+# emm_resp_scf[5:8]
 ```
 
 ```{r message=FALSE}
 emmip(emm_resp_scf, ~ Congruency | SameDifferent + Cue, CIs = TRUE) +
   geom_hline(yintercept = 0, linetype = "dashed")
 ```
-
 
 # Response times
 ```{r only keep correct trials (but with both same and different trials)}
@@ -687,19 +685,161 @@ emm_rt_fi[1:4]
 emmip(emm_rt_fi[1:4], ~ Congruency  | Cue, CIs = TRUE) +
   geom_hline(yintercept = 0, linetype = "dashed")
 ```
+
+# Response times with same trials only
+```{r only keep correct "same incongruent" trials}
+df_lmm_rt_scf <- df_lmm_rt %>% 
+  filter(SameDifferent == "same",
+         Congruency == "incongruent")
+
+# save(df_lmm_rt_scf, file = file.path("data", "df_lmm_rt_scf.RData"))
+```
+
+## Fitting the generalized mixed models
+with log-transformation.
+### The maximal model
+```{r rt scf max}
+# file_rt_scf_max <- file.path(folder_lmm, "rt_scf_lmm_max.RData")
+# 
+# # fit the max model
+# if (!file.exists(file_rt_scf_max)) {
+#   glmm_rt_scf_max <- glmer(
+#     log(RT) ~ Cue * Alignment + Probability +
+#       (Cue * Alignment | Participant), 
+#     family = lognormal(),
+#     data = df_lmm_rt_scf,
+#     control = glmerControl(optimizer = "optimx", # calc.derivs = FALSE,
+#                            optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE))
+#   )
+# 
+#   save(glmm_rt_scf_max, file = file_rt_scf_max)
+# } else {
+#   load(file_rt_scf_max)
+# }
+# 
+# print(summary(glmm_rt_scf_max), corr = FALSE)
+
+```
+
+
+### The zero-correlation-parameter model
+```{r rt_scf zcp}
+
+file_rt_scf_zcp <- file.path(folder_lmm, "rt_scf_lmm_zcp.RData")
+
+# fit the zcp1 model
+if (!file.exists(file_rt_scf_zcp)) {
+  glmm_rt_scf_zcp <- lmer(
+    log(RT) ~ Cue * Alignment + Probability + 
+      (Cue_C + Ali_C + 
+         Cue_Ali || Participant),
+    data = df_lmm_rt_scf,
+    control = lmerControl(optimizer = "optimx", # calc.derivs = FALSE,
+                          optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE))
+  )
+    # save(glmm_rt_scf_zcp, file = file_rt_scf_zcp)
+} else {
+    load(file_rt_scf_zcp)
+}
+
+print(summary(glmm_rt_scf_zcp), corr = FALSE)
+
+```
+
+### The reduced model
+```{r PCA analysis for rt scf zcp lmm}
+summary(rePCA(glmm_rt_scf_zcp))
+```
+
+```{r rt_scf rdc}
+file_rt_scf_rdc <- file.path(folder_lmm, "rt_scf_lmm_rdc.RData")
+
+# fit the rdc model
+if (!file.exists(file_rt_scf_rdc)) {
+  glmm_rt_scf_rdc <- lmer(
+    log(RT) ~ Cue * Alignment + Probability + 
+      (Cue_C + # Ali_C + 
+         Cue_Ali || Participant),
+    data = df_lmm_rt_scf,
+    control = lmerControl(optimizer = "optimx", # calc.derivs = FALSE,
+                          optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE))
+  )
+    # save(glmm_rt_scf_rdc, file = file_rt_scf_rdc)
+} else {
+    load(file_rt_scf_rdc)
+}
+
+print(summary(glmm_rt_scf_rdc), corr = FALSE)
+
+```
+
+### The extended model
+```{r rt_scf etd}
+file_rt_scf_etd <- file.path(folder_lmm, "rt_scf_lmm_etd.RData")
+
+# fit the etd model
+if (!file.exists(file_rt_scf_etd)) {
+  glmm_rt_scf_etd <- lmer(
+    log(RT) ~ Cue * Alignment + Probability + 
+      (Cue_C + # Ali_C + 
+         Cue_Ali | Participant),
+    data = df_lmm_rt_scf,
+    control = lmerControl(optimizer = "optimx", # calc.derivs = FALSE,
+                          optCtrl = list(method = "nlminb", starttests = FALSE, kkt = FALSE))
+  )
+    # save(glmm_rt_scf_etd, file = file_rt_scf_etd)
+} else {
+    load(file_rt_scf_etd)
+}
+
+print(summary(glmm_rt_scf_etd), corr = FALSE)
+# save(glmm_rt_scf_etd, file = file.path("lmm_output", "rt_scf_lmm_etd.RData"))
+```
+
+### The optimal model
+```{r comapre rt scf etd and rdc}
+# compare the extended and reduced model
+anova(glmm_rt_scf_etd, glmm_rt_scf_rdc, refit = FALSE)
+```
+
+```{r the optimal model rt scf}
+glmm_rt_scf_opt <- glmm_rt_scf_etd
+
+print(summary(glmm_rt_scf_opt), corr = FALSE)
+```
+
+## Estimated marginal means
+```{r emm rt scf}
+file_rt_scf_emm <- file.path(folder_lmm, "rt_scf_emm.RData") 
+if (!file.exists(file_rt_scf_emm)) {
+  emm_rt_scf <- emmeans(glmm_rt_scf_opt, ~ Cue + Alignment, pbkrtest.limit = 10500)
+  save(emm_rt_scf)
+} else {
+  load(file_rt_scf_emm)
+}
+
+summary(emm_rt_scf, type = "response") 
 ```
 
 ```{r}
-# Accuracy for same trials only
-temp <- contrast(regrid(emm_resp), method = "pairwise", simple = "Alignment", infer = TRUE)
-temp[1:4]
-
-# summary(temp[1:2], side = ">")
-# summary(temp[3:4], side = "<")
-
+emmip(emm_rt_scf, ~ Alignment | Cue, CIs = TRUE)
 ```
 
+#### Composite effects
+Composite face effects for top and bottom parts:
 ```{r}
-temp[5:8]
+emm_rt_scf_cf <- contrast(regrid(emm_rt_scf), "pairwise", by = "Cue", infer = TRUE)
+emm_rt_scf_cf[1:2]
 ```
+
+```{r message=FALSE}
+emmip(emm_rt_scf_cf, ~ Cue, CIs = TRUE) +
+  geom_hline(yintercept = 0, linetype = "dashed")
+```
+
+# Session information
+```{r}
+sessionInfo()
+```
+
 
