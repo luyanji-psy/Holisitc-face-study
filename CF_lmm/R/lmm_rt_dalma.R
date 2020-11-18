@@ -91,11 +91,11 @@ tic()
 
 
 ######### emmeans for scf #########
-load("df_lmm_rt_scf.RData")
-library(emmeans)
-load("rt_scf_lmm_etd.RData")
-glmm_rt_scf_opt <- glmm_rt_scf_etd
-emm_rt_scf <- emmeans(glmm_rt_scf_opt, ~ Cue + Alignment)
-save(emm_rt_scf, file = "rt_scf_emm.RData")
+# load("df_lmm_rt_scf.RData")
+# library(emmeans)
+# load("rt_scf_lmm_etd.RData")
+# glmm_rt_scf_opt <- glmm_rt_scf_etd
+# emm_rt_scf <- emmeans(glmm_rt_scf_opt, ~ Cue + Alignment)
+# save(emm_rt_scf, file = "rt_scf_emm.RData")
 
 toc()
