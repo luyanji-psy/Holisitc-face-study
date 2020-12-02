@@ -46,6 +46,10 @@ library(optimx)
 library(emmeans)
 
 folder_lmm <- "lmm_output"
+ylimit_cf_d <- c(-.5, 3.2)
+ylimit_cf_fi_d <- c(-1.1, 1.1)
+ylimit_cf_rt <- c(650, 1150)
+ylimit_cf_fi_rt <- c(-100, 100)
 ```
 
 
@@ -158,7 +162,9 @@ df_lmm_E1 <- df_lmm %>%
   droplevels()
 
 # save(df_lmm_E1, file = file.path("data", "df_lmm_E1.RData"))
+nlevels(df_lmm_E1$Participant)
 ```
+
 ## Response (d')
 ### Fitting the generalized mixed models
 #### The maximal model
@@ -442,11 +448,61 @@ print(summary(glmm_E1_resp_opt), corr = FALSE)
 ```{r message=FALSE}
 emm_E1_d <- contrast(emm_E1_resp, method = "pairwise", simple = "SameDifferent")
 summary(emm_E1_d[1:8], infer = c(TRUE, FALSE))
+
+# quick check (uncorrected)
+# emmip(emm_E1_d, Congruency ~ Alignment | Cue, CIs = TRUE) 
 ```
 
-```{r message=FALSE}
-emmip(emm_E1_d, Congruency ~ Alignment | Cue, CIs = TRUE)
+
+```{r plot for publication E1 d slides, fig.width=3, fig.asp=.6}
+plot_E1_cf_d <- summary(emm_E1_d[1:8], infer = c(TRUE, FALSE)) %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = estimate, x = Alignment, color = Congruency, group = Congruency)) +
+  geom_point(position = position_dodge(width = 0.1), size = 2) +
+  geom_line(aes(linetype = Congruency), position = position_dodge(width = 0.1),
+            size = 0.8) +
+  scale_linetype_manual(values=c("solid", "dashed"))+
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6, position = position_dodge(width = 0.1),
+                show.legend = F) + 
+  facet_grid(. ~Cue, switch = "both") +
+  coord_cartesian(ylim = ylimit_cf_d) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Cues", y = expression("Sensitivity"~italic("d'")), fill = "Congruency") +  # set the names for main, x and y axises
+  geom_text(label = c("***", "", "", "", "*", "", "", ""), color = "red", size = 6, nudge_y = 0.5, nudge_x = 0.5) + # add starts to the significant columns
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "right",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) 
+
+# ggsave(filename = "E1_cf_d.pdf", plot_E1_cf_d, width = 8, height = 4.8)
+
+plot_E1_cf_d
 ```
+
+```{r plot for publication E1 d paper, fig.width=3, fig.asp=.6}
+# ggsave(filename = "E1_cf_d.pdf", 
+#        plot_E1_cf_d +
+#          theme(legend.position=c(0.5, 0.15)), 
+#        width = 7)
+```
+
 
 #### Composite effects
 Composite face effects for top and bottom parts:
@@ -460,12 +516,55 @@ summary(emm_E1_d_cf[1:2], infer = TRUE)
 # Sensitivity d'
 emm_E1_d_fi <- contrast(emm_E1_resp, interaction = "pairwise", by = c("Cue", "Congruency"), adjust = "Tukey")
 summary(emm_E1_d_fi[1:4], infer=TRUE)
+
+# # showing the differences between aligned and misaligned (aligned-misaligned)
+emmip(emm_E1_d_fi[1:4], ~ Cue | Congruency, CIs = TRUE, adjust = "Tukey") +
+  geom_hline(yintercept = 0, linetype = "dashed")
+```
+
+```{r fi E1 d, fig.width=3, fig.asp=.65}
+plot_E1_cffi_d <- summary(emm_E1_d_fi[1:4], infer=TRUE) %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = estimate, x = Cue, color = Congruency)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(. ~ Congruency, switch = "both") +
+  coord_cartesian(ylim = ylimit_cf_fi_d) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Congruency", y = expression(italic("d'")~"(aligned-misaligned)")) +  # set the names for main, x and y axises
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "none",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) +
+  NULL
+
+# ggsave(filename = "E1_fi_d.pdf", plot_E1_cffi_d, width = 7, height = 4.55)
+
+plot_E1_cffi_d
 ```
 
 ```{r message=FALSE}
-# showing the differences between aligned and misaligned (aligned-misaligned)
-emmip(emm_E1_d_fi[1:4], ~ Cue | Congruency, CIs = TRUE, adjust = "Tukey") +
-  geom_hline(yintercept = 0, linetype = "dashed")
+# Sensitivity d'
+test <- contrast(emm_E1_resp, method ="pairwise", simple = "Alignment", adjust = "Tukey")
+test[1:8]
 ```
 
 ## Response times
@@ -630,13 +729,53 @@ if (!file.exists(file_E1_rt_emm)) {
   load(file_E1_rt_emm)
 }
 
+# emmip(regrid(emm_E1_rt), Congruency ~ Alignment | Cue, CIs = TRUE)
+
 summary(emm_E1_rt, type = "response") # equivalent to regrid(emm_rt)
 ```
 
-```{r}
-emmip(regrid(emm_E1_rt), Congruency ~ Alignment | Cue, CIs = TRUE)
-```
 
+```{r plot for publication E1 rt slides, fig.width=3, fig.asp=.6}
+plot_E1_cf_rt <- summary(emm_E1_rt, type = "response") %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = response, x = Alignment, color = Congruency, group = Congruency)) +
+  geom_point(position = position_dodge(width = 0.1), size = 2) +
+  geom_line(aes(linetype = Congruency), position = position_dodge(width = 0.1),
+            size = 0.8) +
+  scale_linetype_manual(values=c("solid", "dashed"))+
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6, position = position_dodge(width = 0.1),
+                show.legend = F) + 
+  facet_grid(. ~Cue, switch = "both") +
+  coord_cartesian(ylim = ylimit_cf_rt) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Cues", y = "Correct response times (ms)", fill = "Congruency") +  # set the names for main, x and y axises
+  geom_text(label = c("", "", "++", "+", "", "", "", ""), color = "blue", size = 6, nudge_y = 50, nudge_x = 0.5) + # add starts to the significant columns
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "right",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) 
+
+# ggsave(filename = "E1_cf_rt.pdf", plot_E1_cf_rt, width = 8, height = 4.8)
+
+plot_E1_cf_rt
+```
 
 #### Composite effects
 Composite face effects for top and bottom parts:
@@ -648,12 +787,48 @@ emm_rt_cf[1:2]
 #### Facilitation and interference
 ```{r}
 emm_E1_rt_fi <- contrast(regrid(emm_E1_rt), "pairwise", by = c("Cue", "Congruency"), infer=TRUE, adjust = "Tukey")
+
+# emmip(emm_E1_rt_fi[1:4], ~ Cue | Congruency, CIs = TRUE, adjust = "Tukey")
 emm_E1_rt_fi[1:4]
 ```
 
-```{r message=FALSE}
-emmip(emm_E1_rt_fi[1:4], ~ Cue | Congruency, CIs = TRUE, adjust = "Tukey") +
-  geom_hline(yintercept = 0, linetype = "dashed")
+```{r fi E1 rt, fig.width=3, fig.asp=.65}
+plot_E1_cffi_rt <- emm_E1_rt_fi[1:4] %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = estimate, x = Cue, color = Congruency)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(. ~ Congruency, switch = "both") +
+  coord_cartesian(ylim = ylimit_cf_fi_rt) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Congruency", y = expression(RT~"(aligned-misaligned)")) +  # set the names for main, x and y axises
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "none",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) +
+  NULL
+
+# ggsave(filename = "E1_fi_rt.pdf", plot_E1_cffi_rt, width = 7, height = 4.55)
+
+plot_E1_cffi_rt
 ```
 
 # Experiment 2
@@ -1060,12 +1235,53 @@ print(summary(glmm_E2_resp_opt), corr = FALSE)
 ```{r message=FALSE}
 emm_E2_d <- contrast(emm_E2_resp, method = "pairwise", simple = "SameDifferent")
 summary(emm_E2_d[1:16], infer = c(TRUE, FALSE))
+
+# emmip(emm_E2_d, Congruency ~ Alignment | Cue + Probability, CIs = TRUE)
 ```
 
+```{r plot for publication E2 d slides, fig.width=3, fig.asp=.6}
+plot_E2_cf_d <- summary(emm_E2_d[1:16], infer = c(TRUE, FALSE)) %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = estimate, x = Alignment, color = Congruency, group = Congruency)) +
+  geom_point(position = position_dodge(width = 0.1), size = 2) +
+  geom_line(aes(linetype = Congruency), position = position_dodge(width = 0.1),
+            size = 0.8) +
+  scale_linetype_manual(values=c("solid", "dashed"))+
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6, position = position_dodge(width = 0.1),
+                show.legend = F) + 
+  facet_grid(Probability ~Cue, switch = "x",
+             labeller = labeller(Probability = c(`0.25` = "25%", `0.75` = "75%"))) +
+  coord_cartesian(ylim = ylimit_cf_d) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Cues", y = expression("Sensitivity"~italic("d'")), fill = "Congruency") +  # set the names for main, x and y axises
+  geom_text(label = c("***", "", "", "", "*", "", "", "", "***", "", "", "", "", "", "", ""), color = "red", size = 6, nudge_y = 0.4, nudge_x = 0.5) + # add starts to the significant columns
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "right",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) 
 
-```{r message=FALSE}
-emmip(emm_E2_d, Congruency ~ Alignment | Cue + Probability, CIs = TRUE)
+# ggsave(filename = "E2_cf_d.pdf", plot_E2_cf_d, width = 8, height = 4.8)
+
+plot_E2_cf_d
 ```
+
 
 #### Composite effects
 Composite face effects for top and bottom parts:
@@ -1079,14 +1295,56 @@ summary(emm_E2_d_cf[1:4], infer = TRUE)
 # Sensitivity d'
 emm_E2_d_fi <- contrast(emm_E2_resp, interaction = "pairwise", by = c("Cue", "Congruency", "Probability"), adjust = "Tukey")
 summary(emm_E2_d_fi[1:8], infer=TRUE)
+
+# emmip(emm_E2_d_fi[1:8], ~ Probability | Cue + Congruency, CIs = TRUE, adjust = "Tukey")
 ```
+
+```{r fi E2 d, fig.width=3, fig.asp=.65}
+plot_E2_cffi_d <- summary(emm_E2_d_fi[1:8], infer=TRUE) %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = estimate, x = Cue, color = Congruency)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(Probability ~ Congruency, switch = "x",
+             labeller = labeller(Probability = c(`0.25` = "25%", `0.75` = "75%"))) +
+  coord_cartesian(ylim = ylimit_cf_fi_d) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Congruency", y = expression(italic("d'")~"(aligned-misaligned)")) +  # set the names for main, x and y axises
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "none",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) +
+  NULL
+
+# ggsave(filename = "E2_fi_d.pdf", plot_E2_cffi_d, width = 7, height = 4.55)
+
+plot_E2_cffi_d
+```
+
 
 ```{r message=FALSE}
-# showing the differences between aligned and misaligned (aligned-misaligned)
-emmip(emm_E2_d_fi[1:8], ~ Probability | Cue + Congruency, CIs = TRUE, adjust = "Tukey") +
-  geom_hline(yintercept = 0, linetype = "dashed")
+# Sensitivity d'
+test2 <- contrast(regrid(emm_E2_resp), method = "pairwise", simple = "Alignment", adjust = "Tukey")
+summary(test2[1:16], infer=TRUE)
 ```
-
 
 ## Response times
 ```{r only keep correct trials (but with both same and different trials) E2}
@@ -1296,12 +1554,55 @@ if (!file.exists(file_E2_rt_emm)) {
 }
 
 summary(emm_E2_rt, type = "response") # equivalent to regrid(emm_rt)
+
+# emmip(regrid(emm_E2_rt), Congruency ~ Alignment | Cue + Probability, CIs = TRUE)
 ```
 
 ```{r}
-emmip(regrid(emm_E2_rt), Congruency ~ Alignment | Cue + Probability, CIs = TRUE)
 ```
 
+```{r plot for publication E2 rt slides, fig.width=3, fig.asp=.6}
+plot_E2_cf_rt <- summary(emm_E2_rt, type = "response") %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = response, x = Alignment, color = Congruency, group = Congruency)) +
+  geom_point(position = position_dodge(width = 0.1), size = 2) +
+  geom_line(aes(linetype = Congruency), position = position_dodge(width = 0.1),
+            size = 0.8) +
+  scale_linetype_manual(values=c("solid", "dashed"))+
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6, position = position_dodge(width = 0.1),
+                show.legend = F) + 
+  facet_grid(Probability ~Cue, switch = "x",
+             labeller = labeller(Probability = c(`0.25` = "25%", `0.75` = "75%"))) +
+  coord_cartesian(ylim = ylimit_cf_rt) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Cues", y = "Correct response times (ms)", fill = "Congruency") +  # set the names for main, x and y axises
+  geom_text(label = c("", "", "**", "***", "", "", "", "", "", "", "*", "*", "", "", "", ""), color = "red", size = 6, nudge_y = 50, nudge_x = 0.5) + # add starts to the significant columns
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "right",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) 
+
+# ggsave(filename = "E2_cf_rt.pdf", plot_E2_cf_rt, width = 8, height = 4.8)
+
+plot_E2_cf_rt
+```
 
 #### Composite effects
 Composite face effects for top and bottom parts:
@@ -1320,6 +1621,48 @@ emm_E2_rt_fi[1:8]
 emmip(emm_E2_rt_fi[1:8], ~ Probability | Cue + Congruency, CIs = TRUE, adjust = "Tukey") +
   geom_hline(yintercept = 0, linetype = "dashed")
 ```
+
+```{r fi E2 rt, fig.width=3, fig.asp=.65}
+plot_E2_cffi_rt <- emm_E2_rt_fi[1:8] %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = estimate, x = Cue, color = Congruency)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(Probability ~ Congruency, switch = "x",
+             labeller = labeller(Probability = c(`0.25` = "25%", `0.75` = "75%"))) +
+  coord_cartesian(ylim = ylimit_cf_fi_rt) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Congruency", y = expression(RT~"(aligned-misaligned)")) +  # set the names for main, x and y axises
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "none",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) +
+  NULL
+
+# ggsave(filename = "E2_fi_rt.pdf", plot_E2_cffi_rt, width = 7, height = 4.55)
+
+plot_E2_cffi_rt
+```
+
+
 
 # Experiment 1 and 2
 ## Responses (d')
@@ -1621,6 +1964,49 @@ summary(emm_d[1:8], infer = c(TRUE, FALSE))
 emmip(emm_d, Congruency ~ Alignment | Cue, CIs = TRUE)
 ```
 
+```{r plot for publication E12 d slides, fig.width=3, fig.asp=.6}
+plot_E12_cf_d <- summary(emm_d[1:8], infer = c(TRUE, FALSE)) %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = estimate, x = Alignment, color = Congruency, group = Congruency)) +
+  geom_point(position = position_dodge(width = 0.1), size = 2) +
+  geom_line(aes(linetype = Congruency), position = position_dodge(width = 0.1),
+            size = 0.8) +
+  scale_linetype_manual(values=c("solid", "dashed"))+
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6, position = position_dodge(width = 0.1),
+                show.legend = F) + 
+  facet_grid(. ~Cue, switch = "both") +
+  coord_cartesian(ylim = ylimit_cf_d) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Cues", y = expression("Sensitivity"~italic("d'")), fill = "Congruency") +  # set the names for main, x and y axises
+  geom_text(label = c("***", "", "", "", "**", "", "", ""), color = "red", size = 6, nudge_y = 0.5, nudge_x = 0.5) + # add starts to the significant columns
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "right",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) 
+
+# ggsave(filename = "E12_cf_d.pdf", plot_E12_cf_d, width = 8, height = 4.8)
+
+plot_E12_cf_d
+```
+
+
 #### Composite effects
 Composite face effects for top and bottom parts:
 ```{r message=FALSE}
@@ -1639,6 +2025,45 @@ summary(emm_d_fi[1:4], infer=TRUE)
 # showing the differences between aligned and misaligned (aligned-misaligned)
 emmip(emm_d_fi[1:4], ~ Cue | Congruency, CIs = TRUE, adjust = "Tukey") +
   geom_hline(yintercept = 0, linetype = "dashed")
+```
+
+```{r fi E12 d, fig.width=3, fig.asp=.65}
+plot_E12_cffi_d <- summary(emm_d_fi[1:4], infer=TRUE) %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = estimate, x = Cue, color = Congruency)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(. ~ Congruency, switch = "both") +
+  coord_cartesian(ylim = ylimit_cf_fi_d) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Congruency", y = expression(italic("d'")~"(aligned-misaligned)")) +  # set the names for main, x and y axises
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "none",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) +
+  NULL
+
+# ggsave(filename = "E12_fi_d.pdf", plot_E12_cffi_d, width = 7, height = 4.55)
+
+plot_E12_cffi_d
 ```
 
 #### SCF analysis
@@ -1850,6 +2275,49 @@ summary(emm_rt, type = "response") # equivalent to regrid(emm_rt)
 emmip(regrid(emm_rt), Congruency ~ Alignment | Cue, CIs = TRUE)
 ```
 
+```{r plot for publication E12 rt slides, fig.width=3, fig.asp=.6}
+plot_E12_cf_rt <- summary(emm_rt, type = "response") %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = response, x = Alignment, color = Congruency, group = Congruency)) +
+  geom_point(position = position_dodge(width = 0.1), size = 2) +
+  geom_line(aes(linetype = Congruency), position = position_dodge(width = 0.1),
+            size = 0.8) +
+  scale_linetype_manual(values=c("solid", "dashed"))+
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6, position = position_dodge(width = 0.1),
+                show.legend = F) + 
+  facet_grid(. ~Cue, switch = "both") +
+  coord_cartesian(ylim = ylimit_cf_rt) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Cues", y = "Correct response times (ms)", fill = "Congruency") +  # set the names for main, x and y axises
+  geom_text(label = c("", "", "++", "+", "", "", "", ""), color = "blue", size = 6, nudge_y = 50, nudge_x = 0.5) + # add starts to the significant columns
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "right",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) 
+
+# ggsave(filename = "E12_cf_rt.pdf", plot_E12_cf_rt, width = 8, height = 4.8)
+
+plot_E12_cf_rt
+```
+
+
 #### Composite effects
 Composite face effects for top and bottom parts:
 ```{r}
@@ -1862,6 +2330,7 @@ emmip(emm_rt_cf[1:2], ~ Cue , CIs = TRUE) +
   geom_hline(yintercept = 0, linetype = "dashed")
 ```
 
+
 #### Facilitation and interference
 ```{r}
 emm_rt_fi <- contrast(regrid(emm_rt), "pairwise", by = c("Cue", "Congruency"), infer=TRUE, adjust = "Tukey")
@@ -1871,6 +2340,45 @@ emm_rt_fi[1:4]
 ```{r message=FALSE}
 emmip(emm_rt_fi[1:4], ~ Cue | Congruency, CIs = TRUE, adjust = "Tukey") +
   geom_hline(yintercept = 0, linetype = "dashed")
+```
+
+```{r fi E12 rt, fig.width=3, fig.asp=.65}
+plot_E12_cffi_rt <- emm_rt_fi[1:4] %>% 
+  as_tibble() %>% 
+  ggplot(aes(y = estimate, x = Cue, color = Congruency)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), size=1.5, width=0, 
+                alpha = .6) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_grid(. ~ Congruency, switch = "both") +
+  coord_cartesian(ylim = ylimit_cf_fi_rt) +  # set the limit for y axis c(0, 1100)
+  labs(x = "Congruency", y = expression(RT~"(aligned-misaligned)")) +  # set the names for main, x and y axises
+  theme_bw() +
+  theme(
+    text = element_text(size = 10),
+    axis.title = element_text(size = 16), 
+    axis.text = element_text(size = 14), # the size of the texts in plot
+    # axis.text.x = element_text(angle = 45, vjust = 0.5),
+    legend.title=element_text(size=15),
+    legend.text=element_text(size=14),
+    legend.position = "none",
+    legend.key.width = unit(1.2, "cm"),
+    plot.title = element_text(lineheight=.8, face="bold", size = 17),
+    panel.border = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank(),
+    axis.line.x = element_line(colour = 'black', size=0.5, linetype='solid'),
+    axis.line.y = element_line(colour = 'black', size=0.5, linetype='solid'),
+    # remove the facet background color
+    strip.text = element_text(face="bold", size=14, lineheight=5.0),
+    strip.background = element_rect(fill="white", colour="white", size=1),
+    strip.placement = "outside"
+  ) +
+  NULL
+
+# ggsave(filename = "E12_fi_rt.pdf", plot_E12_cffi_rt, width = 7, height = 4.55)
+
+plot_E12_cffi_rt
 ```
 
 ## Response times with same trials only
