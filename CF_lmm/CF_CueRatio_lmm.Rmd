@@ -99,7 +99,7 @@ df_tidy <- df_raw %>%
          SameDifferent = factor(SameDifferent, levels = c("same", "different")),
          Probability = as_factor(Probability),
          Resp = if_else(thisResponse == "S", 1, 0),
-         RT = round(reactionTime * 1000+200)) # plus the duration of target faces
+         RT = round(reactionTime * 1000)) 
 
 ```
 
