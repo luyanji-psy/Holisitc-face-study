@@ -2150,7 +2150,7 @@ print(summary(glmm_rt_zcp), corr = FALSE)
 summary(rePCA(glmm_rt_zcp))
 ```
 
-`Con_Ali`, `Cue_Ali`, and `Ali_C` were removed from extended model (`glmm_rt_zcp`) due to that the variances they explained were smaller than 0.1%, making `glmm_rt_rdc`.
+`Con_Ali`, and `Cue_Ali` were removed from extended model (`glmm_rt_zcp`) due to that the variances they explained were smaller than 0.1%, making `glmm_rt_rdc`.
 
 ```{r rt reduced}
 file_rt_rdc <- file.path(folder_lmm, "rt_lmm_rdc.RData")
@@ -2160,7 +2160,7 @@ file_rt_rdc <- file.path(folder_lmm, "rt_lmm_rdc.RData")
 if (!file.exists(file_rt_rdc)) {
   glmm_rt_rdc <- lmer(
     log(RT) ~ Cue * Congruency * Alignment + Probability + 
-      (Cue_C + Con_C + # Ali_C + 
+      (Cue_C + Con_C + Ali_C + 
          Cue_Con +  # Con_Ali + Cue_Ali +
          Cue_Con_Ali || Participant),
     data = df_lmm_rt,
@@ -2183,7 +2183,7 @@ file_rt_etd <- file.path(folder_lmm, "rt_lmm_etd.RData")
 if (!file.exists(file_rt_etd)) {
    glmm_rt_etd <- lmer(
     log(RT) ~ Cue * Congruency * Alignment + Probability + 
-      (Cue_C + Con_C + # Ali_C + 
+      (Cue_C + Con_C + Ali_C + 
          Cue_Con +  # Con_Ali + Cue_Ali +
          Cue_Con_Ali | Participant),
     data = df_lmm_rt,
@@ -2220,7 +2220,7 @@ print(summary(glmm_rt_etd1), corr = FALSE)
 summary(rePCA(glmm_rt_etd1))
 ```
 
-`Con_C` and `Cue_Con` were removed from extended model (`glmm_resp_etd1`) due to that the variances they explained were smaller than 1%, making `glmm_resp_etd2`.
+`Con_C` and `Ali_C` were removed from extended model (`glmm_resp_etd1`) due to that the variances they explained were smaller than 1%, making `glmm_resp_etd2`.
 
 ```{r rt exteded model glmm_rt_etd2}
 file_rt_etd2 <- file.path(folder_lmm, "rt_lmm_etd2.RData")
@@ -2229,8 +2229,8 @@ file_rt_etd2 <- file.path(folder_lmm, "rt_lmm_etd2.RData")
 if (!file.exists(file_rt_etd2)) {
   glmm_rt_etd2 <- lmer(
     log(RT) ~ Cue * Congruency * Alignment + Probability + 
-      (Cue_C +  # Ali_C + Con_C +
-           # Con_Ali + Cue_Ali + Cue_Con +
+      (Cue_C + # Con_C + Ali_C + 
+         Cue_Con +  # Con_Ali + Cue_Ali +
          Cue_Con_Ali | Participant),
     data = df_lmm_rt,
     control = lmerControl(optimizer = "optimx", # calc.derivs = FALSE,
@@ -2253,7 +2253,7 @@ anova(glmm_rt_etd2, glmm_rt_rdc, refit = FALSE)
 According to BIC, the reduced model (`glmm_resp_rdc`) explained the data better than the extended model (`glmm_resp_etd2`) and, therefore, the reduced model is used as the optimal model.
 
 ```{r the optimal model rt}
-glmm_rt_opt <- glmm_rt_etd2
+glmm_rt_opt <- glmm_rt_rdc
 
 print(summary(glmm_rt_opt), corr = FALSE)
 ```
@@ -2289,7 +2289,7 @@ plot_E12_cf_rt <- summary(emm_rt, type = "response") %>%
   facet_grid(. ~Cue, switch = "both") +
   coord_cartesian(ylim = ylimit_cf_rt) +  # set the limit for y axis c(0, 1100)
   labs(x = "Cues", y = "Correct response times (ms)", fill = "Congruency") +  # set the names for main, x and y axises
-  geom_text(label = c("", "", "++", "+", "", "", "", ""), color = "blue", size = 6, nudge_y = 50, nudge_x = 0.5) + # add starts to the significant columns
+  geom_text(label = c("", "", "***", "***", "", "", "", ""), color = "red", size = 6, nudge_y = 50, nudge_x = 0.5) + # add starts to the significant columns
   theme_bw() +
   theme(
     text = element_text(size = 10),

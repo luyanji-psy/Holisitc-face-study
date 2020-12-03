@@ -5,7 +5,7 @@ library(tictoc)
 tic()
 
 # load the data
-# load("df_lmm_rt.RData")
+load("df_lmm_rt.RData")
 
 ######### max model #########
 
@@ -13,9 +13,9 @@ tic()
 ######### zcp model #########
 # message("Fitting glmm_rt_zcp...")
 # glmm_rt_zcp <- lmer(
-#     log(RT) ~ Cue * Congruency * Alignment + Probability +
-#         (Cue_C + Con_C + Ali_C +
-#              Cue_Con + Cue_Ali + Con_Ali +
+#     log(RT) ~ Cue * Congruency * Alignment + Probability + 
+#         (Cue_C + Con_C + Ali_C + 
+#              Cue_Con + Cue_Ali + Con_Ali + 
 #              Cue_Con_Ali || Participant),
 #     data = df_lmm_rt,
 #     control = lmerControl(optimizer = "optimx", # calc.derivs = FALSE,
@@ -29,7 +29,7 @@ tic()
 # message("Fitting glmm_rt_rdc...")
 # glmm_rt_rdc <- lmer(
 #     log(RT) ~ Cue * Congruency * Alignment + Probability + 
-#         (Cue_C + Con_C + # Ali_C + 
+#         (Cue_C + Con_C + Ali_C + 
 #              Cue_Con +  # Con_Ali + Cue_Ali +
 #              Cue_Con_Ali || Participant),
 #     data = df_lmm_rt,
@@ -44,7 +44,7 @@ tic()
 # message("Fitting glmm_rt_etd...")
 # glmm_rt_etd <- lmer(
 #     log(RT) ~ Cue * Congruency * Alignment + Probability + 
-#         (Cue_C + Con_C + # Ali_C + 
+#         (Cue_C + Con_C + Ali_C + 
 #              Cue_Con +  # Con_Ali + Cue_Ali +
 #              Cue_Con_Ali | Participant),
 #     data = df_lmm_rt,
@@ -71,8 +71,8 @@ tic()
 # message("Fitting glmm_rt_etd2...")
 # glmm_rt_etd2 <- lmer(
 #     log(RT) ~ Cue * Congruency * Alignment + Probability + 
-#         (Cue_C +  # Ali_C + Con_C +
-#              # Con_Ali + Cue_Ali + Cue_Con +
+#         (Cue_C + # Con_C + Ali_C + 
+#              Cue_Con +  # Con_Ali + Cue_Ali +
 #              Cue_Con_Ali | Participant),
 #     data = df_lmm_rt,
 #     control = lmerControl(optimizer = "optimx", # calc.derivs = FALSE,
@@ -84,8 +84,8 @@ tic()
 
 ######### emmeans #########
 # library(emmeans)
-# load("rt_lmm_etd2.RData")
-# glmm_rt_opt <- glmm_rt_etd2
+# load("rt_lmm_rdc.RData")
+# glmm_rt_opt <- glmm_rt_rdc
 # emm_rt <- emmeans(glmm_rt_opt, ~ Cue + Congruency + Alignment)
 # save(emm_rt, file = "rt_emm.RData")
 
