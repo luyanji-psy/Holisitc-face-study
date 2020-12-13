@@ -1239,7 +1239,7 @@ summary(emm_E2_d[1:16], infer = c(TRUE, FALSE))
 # emmip(emm_E2_d, Congruency ~ Alignment | Cue + Probability, CIs = TRUE)
 ```
 
-```{r plot for publication E2 d slides, fig.width=3, fig.asp=.6}
+```{r plot for publication E2 d slides, fig.width=6, fig.asp=.6}
 plot_E2_cf_d <- summary(emm_E2_d[1:16], infer = c(TRUE, FALSE)) %>% 
   as_tibble() %>% 
   ggplot(aes(y = estimate, x = Alignment, color = Congruency, group = Congruency)) +
@@ -1251,7 +1251,7 @@ plot_E2_cf_d <- summary(emm_E2_d[1:16], infer = c(TRUE, FALSE)) %>%
                 alpha = .6, position = position_dodge(width = 0.1),
                 show.legend = F) + 
   facet_grid(Probability ~Cue, switch = "x",
-             labeller = labeller(Probability = c(`0.25` = "25%", `0.75` = "75%"))) +
+             labeller = labeller(Probability = c(`0.25` = "25% cueing top", `0.75` = "75% cueing top"))) +
   coord_cartesian(ylim = ylimit_cf_d) +  # set the limit for y axis c(0, 1100)
   labs(x = "Cues", y = expression("Sensitivity"~italic("d'")), fill = "Congruency") +  # set the names for main, x and y axises
   geom_text(label = c("***", "", "", "", "*", "", "", "", "***", "", "", "", "", "", "", ""), color = "red", size = 6, nudge_y = 0.4, nudge_x = 0.5) + # add starts to the significant columns
@@ -1299,7 +1299,7 @@ summary(emm_E2_d_fi[1:8], infer=TRUE)
 # emmip(emm_E2_d_fi[1:8], ~ Probability | Cue + Congruency, CIs = TRUE, adjust = "Tukey")
 ```
 
-```{r fi E2 d, fig.width=3, fig.asp=.65}
+```{r fi E2 d, fig.width=6, fig.asp=.65}
 plot_E2_cffi_d <- summary(emm_E2_d_fi[1:8], infer=TRUE) %>% 
   as_tibble() %>% 
   ggplot(aes(y = estimate, x = Cue, color = Congruency)) +
@@ -1308,7 +1308,7 @@ plot_E2_cffi_d <- summary(emm_E2_d_fi[1:8], infer=TRUE) %>%
                 alpha = .6) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   facet_grid(Probability ~ Congruency, switch = "x",
-             labeller = labeller(Probability = c(`0.25` = "25%", `0.75` = "75%"))) +
+             labeller = labeller(Probability = c(`0.25` = "25% cueing top", `0.75` = "75% cueing top"))) +
   coord_cartesian(ylim = ylimit_cf_fi_d) +  # set the limit for y axis c(0, 1100)
   labs(x = "Congruency", y = expression(italic("d'")~"(aligned-misaligned)")) +  # set the names for main, x and y axises
   theme_bw() +
@@ -1561,7 +1561,7 @@ summary(emm_E2_rt, type = "response") # equivalent to regrid(emm_rt)
 ```{r}
 ```
 
-```{r plot for publication E2 rt slides, fig.width=3, fig.asp=.6}
+```{r plot for publication E2 rt slides, fig.width=6, fig.asp=.6}
 plot_E2_cf_rt <- summary(emm_E2_rt, type = "response") %>% 
   as_tibble() %>% 
   ggplot(aes(y = response, x = Alignment, color = Congruency, group = Congruency)) +
@@ -1573,7 +1573,7 @@ plot_E2_cf_rt <- summary(emm_E2_rt, type = "response") %>%
                 alpha = .6, position = position_dodge(width = 0.1),
                 show.legend = F) + 
   facet_grid(Probability ~Cue, switch = "x",
-             labeller = labeller(Probability = c(`0.25` = "25%", `0.75` = "75%"))) +
+             labeller = labeller(Probability = c(`0.25` = "25% cueing top", `0.75` = "75% cueing top"))) +
   coord_cartesian(ylim = ylimit_cf_rt) +  # set the limit for y axis c(0, 1100)
   labs(x = "Cues", y = "Correct response times (ms)", fill = "Congruency") +  # set the names for main, x and y axises
   geom_text(label = c("", "", "**", "***", "", "", "", "", "", "", "*", "*", "", "", "", ""), color = "red", size = 6, nudge_y = 50, nudge_x = 0.5) + # add starts to the significant columns
@@ -1622,7 +1622,7 @@ emmip(emm_E2_rt_fi[1:8], ~ Probability | Cue + Congruency, CIs = TRUE, adjust = 
   geom_hline(yintercept = 0, linetype = "dashed")
 ```
 
-```{r fi E2 rt, fig.width=3, fig.asp=.65}
+```{r fi E2 rt, fig.width=6, fig.asp=.65}
 plot_E2_cffi_rt <- emm_E2_rt_fi[1:8] %>% 
   as_tibble() %>% 
   ggplot(aes(y = estimate, x = Cue, color = Congruency)) +
@@ -1631,7 +1631,7 @@ plot_E2_cffi_rt <- emm_E2_rt_fi[1:8] %>%
                 alpha = .6) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   facet_grid(Probability ~ Congruency, switch = "x",
-             labeller = labeller(Probability = c(`0.25` = "25%", `0.75` = "75%"))) +
+             labeller = labeller(Probability = c(`0.25` = "25% cueing top", `0.75` = "75% cueing top"))) +
   coord_cartesian(ylim = ylimit_cf_fi_rt) +  # set the limit for y axis c(0, 1100)
   labs(x = "Congruency", y = expression(RT~"(aligned-misaligned)")) +  # set the names for main, x and y axises
   theme_bw() +
