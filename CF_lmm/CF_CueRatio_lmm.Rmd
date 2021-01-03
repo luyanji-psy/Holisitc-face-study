@@ -43,6 +43,7 @@ library(lme4)
 library(lmerTest)
 library(optimx)
 library(emmeans)
+library(ggpubr)
 
 folder_lmm <- "lmm_output"
 ylimit_cf_d <- c(-.5, 3.2)
@@ -560,11 +561,46 @@ plot_E1_cffi_d <- summary(emm_E1_d_fi[1:4], infer=TRUE) %>%
 plot_E1_cffi_d
 ```
 
-```{r message=FALSE}
-# Sensitivity d'
-test <- contrast(emm_E1_resp, method ="pairwise", simple = "Alignment", adjust = "Tukey")
-test[1:8]
+
+```{r combined plot d E1, fig.width=6, fig.asp=.5}
+
+plot_E1_cf_d_ <- plot_E1_cf_d +
+  guides(color = guide_legend(nrow = 1, title.position = "left"), 
+         linetype = guide_legend(nrow = 1, title.position = "left")) +
+  theme(legend.position = c(0.6, 0.075),
+        legend.box = "horizontal") 
+
+plot_E1_d <- ggarrange(plot_E1_cf_d_, plot_E1_cffi_d, 
+                       labels = c("A", "B"),
+                       font.label = (list(size = 20)),
+                       widths = c(1.5, 1),
+                       nrow = 1)
+
+# ggsave(filename = "E1_d.pdf", plot_E1_d, width = 10, height = 4.5)
+plot_E1_d
 ```
+
+```{r message=FALSE}
+# test <- contrast(emm_E1_resp, method ="pairwise", simple = "Alignment", adjust = "Tukey")
+# test[1:8]
+```
+
+#### Comparisons between facilitation and interference
+
+```{r}
+summary(contrast(emm_E1_d_fi, method = list("faci-inte"=c(1, 1)), by = "Cue"), infer = TRUE)
+```
+
+```{r}
+# summary(contrast(emm_E1_d, method = list("faci-inte"=c(1, -1, 1, -1 )), by = "Cue"), infer = TRUE)
+```
+
+
+```{r}
+# emmeans(glmm_E1_resp_opt, ~ Alignment + SameDifferent | Cue ) %>% 
+#   contrast(interaction = "pairwise")
+```
+
 
 ## Response times
 ```{r only keep correct trials (but with both same and different trials) E1}
@@ -829,6 +865,38 @@ plot_E1_cffi_rt <- emm_E1_rt_fi[1:4] %>%
 
 plot_E1_cffi_rt
 ```
+
+```{r combined plot rt E1, fig.width=6, fig.asp=.5}
+
+plot_E1_cf_rt_ <- plot_E1_cf_rt +
+  guides(color = guide_legend(nrow = 1, title.position = "left"), 
+         linetype = guide_legend(nrow = 1, title.position = "left")) +
+  theme(legend.position = c(0.55, 0.075),
+        legend.box = "horizontal") 
+
+plot_E1_rt <- ggarrange(plot_E1_cf_rt_, plot_E1_cffi_rt, 
+                       labels = c("A", "B"),
+                       font.label = (list(size = 20)),
+                       widths = c(1.5, 1),
+                       nrow = 1)
+
+# ggsave(filename = "E1_rt.pdf", plot_E1_rt, width = 10, height = 4.5)
+plot_E1_rt
+```
+
+#### Comparisons between facilitation and interference
+
+```{r}
+summary(contrast(emm_E1_rt_fi, method = list("faci-inte"=c(1, 1)), by = "Cue"), infer = TRUE)
+```
+
+```{r}
+emmeans(regrid(emm_E1_rt), ~ Alignment | Cue) %>% 
+  # regrid() %>% 
+  contrast(interaction = "pairwise") %>% 
+  summary(infer = TRUE)
+```
+
 
 # Experiment 2
 ```{r only keep E2}
@@ -1338,11 +1406,40 @@ plot_E2_cffi_d <- summary(emm_E2_d_fi[1:8], infer=TRUE) %>%
 plot_E2_cffi_d
 ```
 
+```{r combined plot d E2, fig.width=6, fig.asp=.5}
+
+plot_E2_cf_d_ <- plot_E2_cf_d +
+  guides(color = guide_legend(nrow = 1, title.position = "left"), 
+         linetype = guide_legend(nrow = 1, title.position = "left")) +
+  theme(legend.position = c(0.6, 0.5),
+        legend.box = "horizontal") 
+
+plot_E2_d <- ggarrange(plot_E2_cf_d_, plot_E2_cffi_d, 
+                       labels = c("A", "B"),
+                       font.label = (list(size = 20)),
+                       widths = c(1.5, 1),
+                       nrow = 1)
+
+ggsave(filename = "E2_d.pdf", plot_E2_d, width = 10, height = 7)
+ plot_E2_d
+```
+
+#### Comparisons between facilitation and interference
+
+```{r}
+summary(contrast(emm_E2_d_fi, method = list("faci-inte"=c(1, 1)), by = c("Cue", "Probability")), infer = TRUE)
+```
+
+```{r}
+# contrast(emmeans(emm_E2_resp, ~ Alignment + SameDifferent | Cue + Probability),
+#          interaction = "pairwise")
+```
+
 
 ```{r message=FALSE}
 # Sensitivity d'
-test2 <- contrast(regrid(emm_E2_resp), method = "pairwise", simple = "Alignment", adjust = "Tukey")
-summary(test2[1:16], infer=TRUE)
+# test2 <- contrast(regrid(emm_E2_resp), method = "pairwise", simple = "Alignment", adjust = "Tukey")
+# summary(test2[1:16], infer=TRUE)
 ```
 
 ## Response times
@@ -2077,6 +2174,24 @@ plot_E12_cffi_d <- summary(emm_d_fi[1:4], infer=TRUE) %>%
 plot_E12_cffi_d
 ```
 
+```{r combined plot d E12, fig.width=6, fig.asp=.5}
+
+plot_E12_cf_d_ <- plot_E12_cf_d +
+  guides(color = guide_legend(nrow = 1, title.position = "left"), 
+         linetype = guide_legend(nrow = 1, title.position = "left")) +
+  theme(legend.position = c(0.6, 0.075),
+        legend.box = "horizontal") 
+
+plot_E12_d <- ggarrange(plot_E12_cf_d_, plot_E12_cffi_d, 
+                       labels = c("A", "B"),
+                       font.label = (list(size = 20)),
+                       widths = c(1.5, 1),
+                       nrow = 1)
+
+# ggsave(filename = "E12_d.pdf", plot_E12_d, width = 10, height = 4.5)
+plot_E12_d
+```
+
 #### Comparisons between facilitation and interference
 
 ```{r}
@@ -2408,6 +2523,24 @@ plot_E12_cffi_rt <- emm_rt_fi[1:4] %>%
 # ggsave(filename = "E12_fi_rt.pdf", plot_E12_cffi_rt, width = 7, height = 4.55)
 
 plot_E12_cffi_rt
+```
+
+```{r combined plot rt E12, fig.width=6, fig.asp=.5}
+
+plot_E12_cf_rt_ <- plot_E12_cf_rt +
+  guides(color = guide_legend(nrow = 1, title.position = "left"), 
+         linetype = guide_legend(nrow = 1, title.position = "left")) +
+  theme(legend.position = c(0.55, 0.075),
+        legend.box = "horizontal") 
+
+plot_E12_rt <- ggarrange(plot_E12_cf_rt_, plot_E12_cffi_rt, 
+                       labels = c("A", "B"),
+                       font.label = (list(size = 20)),
+                       widths = c(1.5, 1),
+                       nrow = 1)
+
+# ggsave(filename = "E12_rt.pdf", plot_E12_rt, width = 10, height = 4.5)
+plot_E12_rt
 ```
 
 #### Comparisons between facilitation and interference
